@@ -1,0 +1,406 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PlatformRole {
+  USER
+  PLATFORM_ADMIN
+}
+
+enum AccountKind {
+  OWNER
+  CUSTOMER
+}
+
+enum VenueMemberRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum BookingSource {
+  MANUAL
+  CUSTOMER
+  ADMIN
+  WHATSAPP
+  PHONE
+  WALK_IN
+}
+
+enum BookingStatus {
+  CONFIRMED
+  PENDING
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  PARTIAL
+}
+
+enum ExceptionType {
+  CLOSED
+  SPECIAL_HOURS
+  BLOCKED
+}
+
+enum NotificationEvent {
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum RecurringSeriesStatus {
+  ACTIVE
+  CANCELLED
+}
+
+model User {
+  id             String       @id @default(uuid()) @db.Uuid
+  supabaseAuthId String       @unique @map("supabase_auth_id")
+  email          String       @unique
+  fullName       String       @map("full_name")
+  phone          String?
+  whatsapp       String?
+  accountKind    AccountKind  @default(CUSTOMER) @map("account_kind")
+  platformRole   PlatformRole @default(USER) @map("platform_role")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  memberships     VenueMember[]
+  createdBookings Booking[]     @relation("BookingCreatedBy")
+  updatedBookings Booking[]     @relation("BookingUpdatedBy")
+  notifications   Notification[]
+
+  @@map("users")
+}
+
+model VenueType {
+  id        String @id @default(uuid()) @db.Uuid
+  slug      String @unique
+  name      String
+  nameAr    String? @map("name_ar")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  venues    VenueTypeAssignment[]
+  resources VenueResource[]
+
+  @@map("venue_types")
+}
+
+model Amenity {
+  id        String  @id @default(uuid()) @db.Uuid
+  slug      String  @unique
+  name      String
+  nameAr    String? @map("name_ar")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  venues VenueAmenity[]
+
+  @@map("amenities")
+}
+
+model Venue {
+  id                         String   @id @default(uuid()) @db.Uuid
+  slug                       String   @unique
+  name                       String
+  description                String?
+  phone                      String
+  whatsapp                   String?
+  address                    String
+  city                       String
+  latitude                   Decimal? @db.Decimal(10, 7)
+  longitude                  Decimal? @db.Decimal(10, 7)
+  coverImageUrl              String?  @map("cover_image_url")
+  isActive                   Boolean  @default(true) @map("is_active")
+  timezone                   String   @default("Asia/Hebron")
+  defaultDurationMinutes     Int      @default(60) @map("default_duration_minutes")
+  minAdvanceHours            Int      @default(0) @map("min_advance_hours")
+  maxAdvanceDays             Int      @default(90) @map("max_advance_days")
+  cancellationHours          Int      @default(0) @map("cancellation_hours")
+  cancellationPolicy         String?  @map("cancellation_policy")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  types     VenueTypeAssignment[]
+  amenities VenueAmenity[]
+  photos    VenuePhoto[]
+  members   VenueMember[]
+  resources VenueResource[]
+  customers Customer[]
+  bookings  Booking[]
+  recurringSeries RecurringSeries[]
+
+  @@index([city])
+  @@index([isActive])
+  @@map("venues")
+}
+
+model VenueTypeAssignment {
+  venueId     String @map("venue_id") @db.Uuid
+  venueTypeId String @map("venue_type_id") @db.Uuid
+
+  venue     Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueType VenueType @relation(fields: [venueTypeId], references: [id], onDelete: Restrict)
+
+  @@id([venueId, venueTypeId])
+  @@map("venue_type_assignments")
+}
+
+model VenueAmenity {
+  venueId   String @map("venue_id") @db.Uuid
+  amenityId String @map("amenity_id") @db.Uuid
+
+  venue   Venue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Restrict)
+
+  @@id([venueId, amenityId])
+  @@map("venue_amenities")
+}
+
+model VenuePhoto {
+  id        String @id @default(uuid()) @db.Uuid
+  venueId   String @map("venue_id") @db.Uuid
+  url       String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@map("venue_photos")
+}
+
+model VenueMember {
+  id        String           @id @default(uuid()) @db.Uuid
+  venueId   String           @map("venue_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      VenueMemberRole
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, userId])
+  @@index([userId])
+  @@map("venue_members")
+}
+
+model VenueResource {
+  id                     String   @id @default(uuid()) @db.Uuid
+  venueId                String   @map("venue_id") @db.Uuid
+  venueTypeId            String?  @map("venue_type_id") @db.Uuid
+  name                   String
+  description            String?
+  isActive               Boolean  @default(true) @map("is_active")
+  defaultDurationMinutes Int      @default(60) @map("default_duration_minutes")
+  slotIntervalMinutes    Int      @default(60) @map("slot_interval_minutes")
+  minDurationMinutes     Int      @default(30) @map("min_duration_minutes")
+  maxDurationMinutes     Int      @default(180) @map("max_duration_minutes")
+  sortOrder              Int      @default(0) @map("sort_order")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  venue          Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueType      VenueType?              @relation(fields: [venueTypeId], references: [id], onDelete: SetNull)
+  operatingHours OperatingHour[]
+  exceptions     AvailabilityException[]
+  pricingRules   PricingRule[]
+  bookings       Booking[]
+  recurringSeries RecurringSeries[]
+
+  @@index([venueId, isActive])
+  @@map("venue_resources")
+}
+
+model OperatingHour {
+  id         String  @id @default(uuid()) @db.Uuid
+  resourceId String  @map("resource_id") @db.Uuid
+  dayOfWeek  Int     @map("day_of_week")
+  opensAt    String  @map("opens_at")
+  closesAt   String  @map("closes_at")
+  isClosed   Boolean @default(false) @map("is_closed")
+
+  resource VenueResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, dayOfWeek])
+  @@map("operating_hours")
+}
+
+model AvailabilityException {
+  id         String        @id @default(uuid()) @db.Uuid
+  resourceId String        @map("resource_id") @db.Uuid
+  type       ExceptionType
+  startsAt   DateTime      @map("starts_at")
+  endsAt     DateTime      @map("ends_at")
+  opensAt    String?       @map("opens_at")
+  closesAt   String?       @map("closes_at")
+  reason     String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  resource VenueResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId, startsAt, endsAt])
+  @@map("availability_exceptions")
+}
+
+model PricingRule {
+  id          String  @id @default(uuid()) @db.Uuid
+  resourceId  String  @map("resource_id") @db.Uuid
+  name        String
+  dayOfWeek   Int?    @map("day_of_week")
+  startsAt    String  @map("starts_at")
+  endsAt      String  @map("ends_at")
+  priceAmount Decimal @map("price_amount") @db.Decimal(10, 2)
+  currency    String  @default("JOD")
+  isDefault   Boolean @default(false) @map("is_default")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  resource VenueResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+  @@map("pricing_rules")
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @map("venue_id") @db.Uuid
+  name      String
+  phone     String
+  whatsapp  String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  venue    Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  recurringSeries RecurringSeries[]
+
+  @@unique([venueId, phone])
+  @@index([venueId, name])
+  @@map("customers")
+}
+
+model Booking {
+  id              String        @id @default(uuid()) @db.Uuid
+  venueId         String        @map("venue_id") @db.Uuid
+  resourceId      String        @map("resource_id") @db.Uuid
+  customerId      String        @map("customer_id") @db.Uuid
+  createdByUserId String?       @map("created_by_user_id") @db.Uuid
+  updatedByUserId String?       @map("updated_by_user_id") @db.Uuid
+  source          BookingSource
+  status          BookingStatus @default(CONFIRMED)
+  paymentStatus   PaymentStatus @default(UNPAID) @map("payment_status")
+  startsAt        DateTime      @map("starts_at")
+  endsAt          DateTime      @map("ends_at")
+  priceAmount     Decimal       @map("price_amount") @db.Decimal(10, 2)
+  paidAmount      Decimal       @default(0) @map("paid_amount") @db.Decimal(10, 2)
+  currency        String        @default("JOD")
+  notes           String?
+  recurringSeriesId String?       @map("recurring_series_id") @db.Uuid
+  cancelledAt     DateTime?     @map("cancelled_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  venue         Venue          @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  resource      VenueResource  @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy     User?          @relation("BookingCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy     User?          @relation("BookingUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  recurringSeries RecurringSeries? @relation(fields: [recurringSeriesId], references: [id], onDelete: SetNull)
+  payments      Payment[]
+  notifications Notification[]
+
+  @@index([resourceId, startsAt, endsAt])
+  @@index([venueId, startsAt])
+  @@index([customerId])
+  @@index([status, startsAt])
+  @@index([recurringSeriesId])
+  @@map("bookings")
+}
+
+model RecurringSeries {
+  id              String                @id @default(uuid()) @db.Uuid
+  venueId         String                @map("venue_id") @db.Uuid
+  resourceId      String                @map("resource_id") @db.Uuid
+  customerId      String                @map("customer_id") @db.Uuid
+  createdByUserId String?               @map("created_by_user_id") @db.Uuid
+  daysOfWeek      Int[]                 @map("days_of_week")
+  startTime       String                @map("start_time")
+  durationMinutes Int                   @map("duration_minutes")
+  priceAmount     Decimal               @map("price_amount") @db.Decimal(10, 2)
+  currency        String                @default("JOD")
+  startDate       DateTime              @map("start_date") @db.Date
+  endDate         DateTime              @map("end_date") @db.Date
+  source          BookingSource         @default(MANUAL)
+  paymentStatus   PaymentStatus         @default(UNPAID) @map("payment_status")
+  notes           String?
+  status          RecurringSeriesStatus @default(ACTIVE)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  venue    Venue         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  resource VenueResource @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  customer Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  @@index([venueId, status])
+  @@index([resourceId])
+  @@map("recurring_series")
+}
+
+model Payment {
+  id        String   @id @default(uuid()) @db.Uuid
+  bookingId String   @map("booking_id") @db.Uuid
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String
+  paidAt    DateTime @default(now()) @map("paid_at")
+  notes     String?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("payments")
+}
+
+model Notification {
+  id          String              @id @default(uuid()) @db.Uuid
+  event       NotificationEvent
+  channel     NotificationChannel
+  status      NotificationStatus  @default(PENDING)
+  bookingId   String?             @map("booking_id") @db.Uuid
+  userId      String?             @map("user_id") @db.Uuid
+  payload     Json
+  scheduledAt DateTime            @map("scheduled_at")
+  sentAt      DateTime?           @map("sent_at")
+  error       String?
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledAt])
+  @@map("notifications")
+}

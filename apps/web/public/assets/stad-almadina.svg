@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <rect width="1200" height="800" fill="#9BB5A4"/>
+  <path d="M0 240 L160 90 H1040 L1200 240 V800 H0Z" fill="#0A3D26"/>
+  <path d="M80 250 L200 120 H1000 L1120 250 Z" fill="#123F2C"/>
+  <g fill="#1B5A3A">
+    <rect x="120" y="150" width="70" height="40" rx="4"/>
+    <rect x="210" y="150" width="70" height="40" rx="4"/>
+    <rect x="300" y="150" width="70" height="40" rx="4"/>
+    <rect x="830" y="150" width="70" height="40" rx="4"/>
+    <rect x="920" y="150" width="70" height="40" rx="4"/>
+    <rect x="1010" y="150" width="70" height="40" rx="4"/>
+  </g>
+  <rect x="70" y="260" width="1060" height="480" fill="#128A44"/>
+  <g fill="none" stroke="#F6FAF6" stroke-width="6">
+    <rect x="120" y="300" width="960" height="400"/>
+    <line x1="600" y1="300" x2="600" y2="700"/>
+    <circle cx="600" cy="500" r="92"/>
+    <rect x="120" y="400" width="180" height="200"/>
+    <rect x="900" y="400" width="180" height="200"/>
+    <rect x="120" y="445" width="80" height="110"/>
+    <rect x="1000" y="445" width="80" height="110"/>
+  </g>
+</svg>

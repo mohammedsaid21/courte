@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --pitch: #0e5c38;
+  --pitch-dark: #0a3d26;
+  --pitch-deep: #072b1b;
+  --gold: #c9a227;
+  --gold-soft: #f4e7b8;
+  --bg: #eef2ef;
+  --surface: #ffffff;
+  --mist: #d7e4da;
+  --border: rgba(255, 255, 255, 0.72);
+  --ink: #12241c;
+  --muted: #5b6b62;
+  --radius: 12px;
+  --shadow: 0 14px 40px rgba(18, 36, 28, 0.1);
+  --blur: 18px;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+* {
+  min-width: 0;
+}
+
+::selection {
+  background: var(--pitch);
+  color: #ffffff;
+}
+
+[dir="rtl"] {
+  text-align: start;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display), var(--font-body), sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .text-display {
+    @apply font-display text-5xl font-extrabold leading-[1.05] md:text-7xl;
+  }
+
+  .text-h1 {
+    @apply font-display text-3xl font-extrabold leading-tight md:text-5xl;
+  }
+
+  .text-h2 {
+    @apply font-display text-2xl font-bold leading-tight md:text-3xl;
+  }
+
+  .text-h3 {
+    @apply font-display text-lg font-bold leading-tight;
+  }
+
+  .text-body {
+    @apply text-base leading-7 text-text-muted;
+  }
+
+  .text-small {
+    @apply text-sm leading-6 text-text-muted;
+  }
+
+  .surface-card {
+    @apply rounded-brand border border-border bg-surface;
+  }
+
+  .page-wrap {
+    @apply mx-auto w-full max-w-6xl px-4 md:px-6;
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(var(--blur));
+    -webkit-backdrop-filter: blur(var(--blur));
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    box-shadow: var(--shadow);
+  }
+
+  .glass-dark {
+    background: rgba(7, 43, 27, 0.62);
+    backdrop-filter: blur(var(--blur));
+    -webkit-backdrop-filter: blur(var(--blur));
+    border: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .reveal {
+    animation: rise 0.7s ease both;
+  }
+
+  .reveal-2 {
+    animation: rise 0.7s ease 0.12s both;
+  }
+
+  .reveal-3 {
+    animation: rise 0.7s ease 0.24s both;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  .reveal,
+  .reveal-2,
+  .reveal-3,
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

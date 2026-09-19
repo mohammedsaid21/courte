@@ -1,0 +1,23 @@
+{
+  "name": "courte",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@12.4.2",
+  "scripts": {
+    "dev": "pnpm run build:shared && pnpm -r --parallel --stream run dev",
+    "dev:api": "pnpm run build:shared && pnpm --filter @courte/api start:dev",
+    "dev:owner": "pnpm --filter @courte/owner dev",
+    "dev:web": "pnpm --filter @courte/web dev",
+    "build": "pnpm -r run build",
+    "build:shared": "pnpm --filter @courte/shared build",
+    "lint": "pnpm --filter @courte/api --filter @courte/owner --filter @courte/web lint",
+    "typecheck": "pnpm run build:shared && pnpm --filter @courte/api --filter @courte/owner --filter @courte/web typecheck",
+    "test": "pnpm --filter @courte/api test",
+    "db:generate": "pnpm --filter @courte/api prisma:generate",
+    "db:migrate": "pnpm --filter @courte/api prisma:migrate",
+    "db:seed": "pnpm --filter @courte/api prisma:seed"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --color-night: #0f172a;
+  --color-lime: #86efac;
+  --color-bg: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-border: #e4e6e0;
+  --color-text: #111318;
+  --color-text-muted: #60646c;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+* {
+  min-width: 0;
+}
+
+::selection {
+  background: #3ddb7a;
+  color: #0f172a;
+}
+
+[dir="rtl"] {
+  text-align: start;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display), var(--font-sans), sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .text-display {
+    @apply font-sans text-4xl font-extrabold leading-tight tracking-tight md:text-5xl;
+  }
+
+  .text-h1 {
+    @apply font-sans text-3xl font-extrabold leading-tight tracking-tight md:text-4xl;
+  }
+
+  .text-h2 {
+    @apply font-sans text-2xl font-bold leading-tight tracking-tight;
+  }
+
+  .text-h3 {
+    @apply text-lg font-bold leading-tight tracking-tight;
+  }
+
+  .text-body {
+    @apply text-sm leading-6 text-text-muted;
+  }
+
+  .text-small {
+    @apply text-xs leading-5 text-text-muted;
+  }
+
+  .surface-card {
+    @apply rounded-brand border border-border bg-surface;
+  }
+
+  .page-wrap {
+    @apply mx-auto w-full max-w-6xl px-4 lg:px-8;
+  }
+
+  .brand-mark {
+    @apply text-xl font-extrabold tracking-tight;
+  }
+}
+
+.calendar-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.calendar-scroll::-webkit-scrollbar-thumb {
+  background: #3ddb7a;
+  border-radius: 999px;
+}
