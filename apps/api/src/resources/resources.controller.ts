@@ -4,6 +4,7 @@ import {
   createExceptionSchema,
   createPricingRuleSchema,
   createResourceSchema,
+  replacePricingSchema,
   updatePricingRuleSchema,
   updateResourceSchema,
   upsertOperatingHoursSchema,
@@ -74,6 +75,15 @@ export class ResourcesController {
   @Get("resources/:resourceId/pricing")
   pricing(@CurrentUser() user: User, @Param("resourceId") resourceId: string) {
     return this.resources.listPricing(user, resourceId);
+  }
+
+  @Put("resources/:resourceId/pricing")
+  replacePricing(
+    @CurrentUser() user: User,
+    @Param("resourceId") resourceId: string,
+    @Body(new ZodPipe(replacePricingSchema)) body: ReturnType<typeof replacePricingSchema.parse>,
+  ) {
+    return this.resources.replacePricing(user, resourceId, body);
   }
 
   @Post("resources/:resourceId/pricing")

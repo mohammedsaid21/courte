@@ -65,6 +65,36 @@ export const NOTIFICATION_CHANNELS = [
 ] as const;
 export const PAYMENT_METHODS = ["CASH", "CARD", "TRANSFER", "OTHER"] as const;
 
+export const BOOKING_DURATIONS = [60, 90] as const;
+
+export const COURT_SIZES = ["FIVE_V_FIVE", "SEVEN_V_SEVEN", "ELEVEN_V_ELEVEN"] as const;
+export const COURT_SIZE_SLUGS = ["5v5", "7v7", "11v11"] as const;
+export const COURT_SURFACES = ["NATURAL_GRASS", "ARTIFICIAL_GRASS"] as const;
+export const COURT_SETTINGS = ["INDOOR", "OUTDOOR"] as const;
+
+export const COURT_SIZE_TO_SLUG = {
+  FIVE_V_FIVE: "5v5",
+  SEVEN_V_SEVEN: "7v7",
+  ELEVEN_V_ELEVEN: "11v11",
+} as const;
+
+export const COURT_SLUG_TO_SIZE = {
+  "5v5": "FIVE_V_FIVE",
+  "7v7": "SEVEN_V_SEVEN",
+  "11v11": "ELEVEN_V_ELEVEN",
+} as const;
+
+/** Friday and Saturday in West Bank. */
+export const WEEKEND_DAYS = [5, 6] as const;
+
+export const PRICING_RULE_NAMES = {
+  REGULAR: "Regular",
+  PEAK: "Peak",
+  WEEKEND: "Weekend",
+} as const;
+
+export const SPEC_AMENITY_SLUGS = ["indoor", "outdoor", "lights"] as const;
+
 export const ACTIVE_BOOKING_STATUSES = [
   "CONFIRMED",
   "PENDING",
@@ -82,3 +112,8 @@ export type ExceptionType = (typeof EXCEPTION_TYPES)[number];
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export type BookingDuration = (typeof BOOKING_DURATIONS)[number];
+export type CourtSize = (typeof COURT_SIZES)[number];
+export type CourtSizeSlug = (typeof COURT_SIZE_SLUGS)[number];
+export type CourtSurface = (typeof COURT_SURFACES)[number];
+export type CourtSetting = (typeof COURT_SETTINGS)[number];

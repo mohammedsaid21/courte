@@ -10,8 +10,9 @@ export function cn(...inputs: ClassValue[]) {
 
 export const TIMEZONE = "Asia/Hebron";
 
-export function formatMoney(amount: number, currency = "JOD") {
-  return `${amount.toFixed(2)} ${currency}`;
+export function formatMoney(amount: number, _currency = "ILS") {
+  const value = amount.toFixed(amount % 1 === 0 ? 0 : 2);
+  return `${value} ₪`;
 }
 
 export function formatTime(iso: string, timeZone = TIMEZONE) {

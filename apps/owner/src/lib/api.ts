@@ -96,6 +96,8 @@ export const ownerApi = {
   pricing: (resourceId: string) => api<PricingRule[]>(`/resources/${resourceId}/pricing`),
   createPricing: (resourceId: string, body: unknown) =>
     api(`/resources/${resourceId}/pricing`, { method: "POST", body: JSON.stringify(body) }),
+  replacePricing: (resourceId: string, body: unknown) =>
+    api<PricingRule[]>(`/resources/${resourceId}/pricing`, { method: "PUT", body: JSON.stringify(body) }),
   updatePricing: (id: string, body: unknown) =>
     api(`/pricing/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deletePricing: (id: string) => api(`/pricing/${id}`, { method: "DELETE" }),
@@ -162,10 +164,13 @@ export type Venue = {
   id: string;
   slug: string;
   name: string;
+  nameEn: string | null;
   description: string | null;
+  descriptionEn: string | null;
   phone: string;
   whatsapp: string | null;
   address: string;
+  addressEn: string | null;
   city: string;
   latitude: number | null;
   longitude: number | null;
@@ -186,7 +191,13 @@ export type Venue = {
 export type Resource = {
   id: string;
   name: string;
+  nameEn: string | null;
   description: string | null;
+  descriptionEn: string | null;
+  size: "FIVE_V_FIVE" | "SEVEN_V_SEVEN" | "ELEVEN_V_ELEVEN" | null;
+  surface: "NATURAL_GRASS" | "ARTIFICIAL_GRASS" | null;
+  setting: "INDOOR" | "OUTDOOR" | null;
+  hasLights: boolean;
   isActive: boolean;
   defaultDurationMinutes: number;
   slotIntervalMinutes: number;
@@ -400,10 +411,13 @@ export type PublicVenue = {
   id: string;
   slug: string;
   name: string;
+  nameEn?: string | null;
   description: string | null;
+  descriptionEn?: string | null;
   phone: string;
   whatsapp: string | null;
   address: string;
+  addressEn?: string | null;
   city: string;
   latitude: number | null;
   longitude: number | null;
@@ -416,7 +430,13 @@ export type PublicVenue = {
   resources: {
     id: string;
     name: string;
+    nameEn?: string | null;
+    size?: string | null;
+    surface?: string | null;
+    setting?: string | null;
+    hasLights?: boolean;
     type: CatalogItem | null;
     hours: { dayOfWeek: number; opensAt: string; closesAt: string; isClosed: boolean }[];
+    pricing?: { name: string; dayOfWeek: number | null; startsAt: string; endsAt: string; priceAmount: number; isDefault: boolean }[];
   }[];
 };

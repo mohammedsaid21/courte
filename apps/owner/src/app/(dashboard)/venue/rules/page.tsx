@@ -51,11 +51,18 @@ export default function BusinessRulesPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <div className="text-xs font-black text-slate-400">المدة الافتراضية</div>
-          <div className="mt-2 text-4xl font-black text-slate-900">{form.defaultDurationMinutes}<span className="ms-1 text-base text-slate-400">د</span></div>
-          <div className="mt-4">
-            <Field label="دقائق">
-              <Input type="number" value={form.defaultDurationMinutes} onChange={(e) => setForm({ ...form, defaultDurationMinutes: Number(e.target.value) })} />
-            </Field>
+          <div className="mt-2 text-4xl font-black text-slate-900">{form.defaultDurationMinutes === 90 ? "ساعة ونصف" : "ساعة"}</div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[60, 90].map((minutes) => (
+              <button
+                type="button"
+                key={minutes}
+                className={`rounded-full px-4 py-2 text-sm font-black ${form.defaultDurationMinutes === minutes ? "bg-brand text-slate-900 shadow-brand" : "bg-slate-100 text-slate-600"}`}
+                onClick={() => setForm({ ...form, defaultDurationMinutes: minutes })}
+              >
+                {minutes === 90 ? "ساعة ونصف" : "ساعة"}
+              </button>
+            ))}
           </div>
         </Card>
         <Card>

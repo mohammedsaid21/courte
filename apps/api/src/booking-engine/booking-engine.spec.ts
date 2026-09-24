@@ -6,6 +6,7 @@ import { summarizeRevenue } from "./revenue";
 import { windowForDate } from "./hours";
 import { distanceKm, roundKm } from "./geo";
 import { evaluateCancellation } from "./cancel";
+import { buildTierPricingRules } from "@courte/shared";
 
 const tz = "Asia/Hebron";
 
@@ -144,6 +145,22 @@ describe("pricing", () => {
     });
     expect(quote.amount).toBe(40);
     expect(quote.ruleName).toBe("Evening");
+  });
+
+  it("uses weekend price on Friday even during peak hours", () => {
+    const quote = quotePrice({
+      start: fromZonedISO("2026-09-18", "18:00", tz),
+      end: fromZonedISO("2026-09-18", "19:00", tz),
+      timeZone: tz,
+      rules: buildTierPricingRules({
+        regularPrice: 50,
+        peakPrice: 70,
+        peakStartsAt: "16:00",
+        weekendPrice: 80,
+      }),
+    });
+    expect(quote.amount).toBe(80);
+    expect(quote.ruleName).toBe("Weekend");
   });
 });
 

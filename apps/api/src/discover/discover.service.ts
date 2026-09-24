@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { DiscoverQuery } from "@courte/shared";
+import { COURT_SLUG_TO_SIZE, DiscoverQuery, courtSizeSlug } from "@courte/shared";
 import { evaluateAdvanceWindow, generateSlots, windowForDate } from "../booking-engine";
 import { distanceKm, roundKm } from "../booking-engine/geo";
 import { hhmmInTimeZone } from "../booking-engine/time";
@@ -30,8 +30,10 @@ export class DiscoverService {
           ? {
               OR: [
                 { name: { contains: search, mode: "insensitive" } },
+                { nameEn: { contains: search, mode: "insensitive" } },
                 { city: { contains: search, mode: "insensitive" } },
                 { address: { contains: search, mode: "insensitive" } },
+                { addressEn: { contains: search, mode: "insensitive" } },
                 {
                   types: {
                     some: { venueType: { name: { contains: search, mode: "insensitive" } } },
@@ -42,6 +44,16 @@ export class DiscoverService {
           : {}),
         ...(query.typeId
           ? { types: { some: { venueTypeId: query.typeId } } }
+          : {}),
+        ...(query.size
+          ? {
+              resources: {
+                some: {
+                  isActive: true,
+                  size: COURT_SLUG_TO_SIZE[query.size],
+                },
+              },
+            }
           : {}),
       },
       include: {
@@ -87,12 +99,16 @@ export class DiscoverService {
         id: venue.id,
         slug: venue.slug,
         name: venue.name,
+        nameEn: venue.nameEn,
         city: venue.city,
         address: venue.address,
+        addressEn: venue.addressEn,
         coverImageUrl: venue.coverImageUrl ?? venue.photos[0]?.url ?? null,
         types: venue.types.map((item) => item.venueType),
-        startingPrice,
-        currency: "JOD",
+        sizes: [...new Set(venue.resources.map((resource) => courtSizeSlug(resource.size)).filter((item): item is NonNullable<typeof item> => item != null))],
+        surfaces: [...new Set(venue.resources.map((resource) => resource.surface).filter((item): item is NonNullable<typeof item> => item != null))],
+        startingPrice: startingPrice,
+        currency: "ILS",
         open: hoursStatus.open,
         hoursLabel: hoursStatus.label,
         distanceKm: distance,

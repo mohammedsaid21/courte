@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -78,6 +79,22 @@ enum RecurringSeriesStatus {
   CANCELLED
 }
 
+enum CourtSize {
+  FIVE_V_FIVE
+  SEVEN_V_SEVEN
+  ELEVEN_V_ELEVEN
+}
+
+enum CourtSurface {
+  NATURAL_GRASS
+  ARTIFICIAL_GRASS
+}
+
+enum CourtSetting {
+  INDOOR
+  OUTDOOR
+}
+
 model User {
   id             String       @id @default(uuid()) @db.Uuid
   supabaseAuthId String       @unique @map("supabase_auth_id")
@@ -127,10 +144,13 @@ model Venue {
   id                         String   @id @default(uuid()) @db.Uuid
   slug                       String   @unique
   name                       String
+  nameEn                     String?  @map("name_en")
   description                String?
+  descriptionEn              String?  @map("description_en")
   phone                      String
   whatsapp                   String?
   address                    String
+  addressEn                  String?  @map("address_en")
   city                       String
   latitude                   Decimal? @db.Decimal(10, 7)
   longitude                  Decimal? @db.Decimal(10, 7)
@@ -209,19 +229,25 @@ model VenueMember {
 }
 
 model VenueResource {
-  id                     String   @id @default(uuid()) @db.Uuid
-  venueId                String   @map("venue_id") @db.Uuid
-  venueTypeId            String?  @map("venue_type_id") @db.Uuid
+  id                     String        @id @default(uuid()) @db.Uuid
+  venueId                String        @map("venue_id") @db.Uuid
+  venueTypeId            String?       @map("venue_type_id") @db.Uuid
   name                   String
+  nameEn                 String?       @map("name_en")
   description            String?
-  isActive               Boolean  @default(true) @map("is_active")
-  defaultDurationMinutes Int      @default(60) @map("default_duration_minutes")
-  slotIntervalMinutes    Int      @default(60) @map("slot_interval_minutes")
-  minDurationMinutes     Int      @default(30) @map("min_duration_minutes")
-  maxDurationMinutes     Int      @default(180) @map("max_duration_minutes")
-  sortOrder              Int      @default(0) @map("sort_order")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
+  descriptionEn          String?       @map("description_en")
+  size                   CourtSize?
+  surface                CourtSurface?
+  setting                CourtSetting?
+  hasLights              Boolean       @default(false) @map("has_lights")
+  isActive               Boolean       @default(true) @map("is_active")
+  defaultDurationMinutes Int           @default(60) @map("default_duration_minutes")
+  slotIntervalMinutes    Int           @default(60) @map("slot_interval_minutes")
+  minDurationMinutes     Int           @default(30) @map("min_duration_minutes")
+  maxDurationMinutes     Int           @default(180) @map("max_duration_minutes")
+  sortOrder              Int           @default(0) @map("sort_order")
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
 
   venue          Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
   venueType      VenueType?              @relation(fields: [venueTypeId], references: [id], onDelete: SetNull)
@@ -232,6 +258,7 @@ model VenueResource {
   recurringSeries RecurringSeries[]
 
   @@index([venueId, isActive])
+  @@index([size])
   @@map("venue_resources")
 }
 

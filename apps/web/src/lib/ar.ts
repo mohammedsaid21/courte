@@ -30,10 +30,20 @@ export const HOME_CITIES = [
 ] as const;
 
 export const COURT_SIZES = [
-  { id: "5v5", label: "5 ضد 5" },
-  { id: "7v7", label: "7 ضد 7" },
-  { id: "11v11", label: "11 ضد 11" },
+  { id: "5v5", label: "5 ضد 5", labelEn: "5 vs 5" },
+  { id: "7v7", label: "7 ضد 7", labelEn: "7 vs 7" },
+  { id: "11v11", label: "11 ضد 11", labelEn: "11 vs 11" },
 ] as const;
+
+export function catalogName(item: { name: string; nameAr?: string | null }, locale: "ar" | "en" = "ar") {
+  if (locale === "en") return item.name;
+  return item.nameAr?.trim() || item.name;
+}
+
+export function localizedText(primary: string | null | undefined, english: string | null | undefined, locale: "ar" | "en") {
+  if (locale === "en") return english?.trim() || primary || "";
+  return primary?.trim() || english || "";
+}
 
 export function cityAr(city: string) {
   return CITY_AR[city] ?? city;

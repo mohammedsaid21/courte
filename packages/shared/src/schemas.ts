@@ -1,9 +1,13 @@
 import { z } from "zod";
 import {
   BOOKING_SOURCES,
-  OWNER_BOOKING_SOURCES,
   BOOKING_STATUSES,
+  COURT_SETTINGS,
+  COURT_SIZE_SLUGS,
+  COURT_SIZES,
+  COURT_SURFACES,
   EXCEPTION_TYPES,
+  OWNER_BOOKING_SOURCES,
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   WEST_BANK_CITIES,
@@ -20,10 +24,13 @@ export const paginationQuerySchema = z.object({
 
 export const createVenueSchema = z.object({
   name: z.string().trim().min(2).max(120),
+  nameEn: z.string().trim().min(2).max(120).optional().nullable(),
   description: z.string().trim().max(4000).optional().nullable(),
+  descriptionEn: z.string().trim().max(4000).optional().nullable(),
   phone: z.string().trim().min(6).max(30),
   whatsapp: z.string().trim().min(6).max(30).optional().nullable(),
   address: z.string().trim().min(4).max(250),
+  addressEn: z.string().trim().max(250).optional().nullable(),
   city: z.string().trim().min(2).max(80),
   latitude: z.number().min(-90).max(90).optional().nullable(),
   longitude: z.number().min(-180).max(180).optional().nullable(),
@@ -54,8 +61,14 @@ export const updateProfileSchema = z.object({
 
 export const createResourceSchema = z.object({
   name: z.string().trim().min(2).max(120),
+  nameEn: z.string().trim().min(2).max(120).optional().nullable(),
   description: z.string().trim().max(2000).optional().nullable(),
+  descriptionEn: z.string().trim().max(2000).optional().nullable(),
   venueTypeId: z.string().uuid().optional().nullable(),
+  size: z.enum(COURT_SIZES).optional().nullable(),
+  surface: z.enum(COURT_SURFACES).optional().nullable(),
+  setting: z.enum(COURT_SETTINGS).optional().nullable(),
+  hasLights: z.boolean().optional(),
   defaultDurationMinutes: z.number().int().min(15).max(480),
   slotIntervalMinutes: z.number().int().min(15).max(240),
   minDurationMinutes: z.number().int().min(15).max(480),
@@ -98,6 +111,10 @@ export const createPricingRuleSchema = z.object({
 });
 
 export const updatePricingRuleSchema = createPricingRuleSchema.partial();
+
+export const replacePricingSchema = z.object({
+  rules: z.array(createPricingRuleSchema).max(21),
+});
 
 export const customerInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -201,6 +218,7 @@ export const discoverQuerySchema = paginationQuerySchema.extend({
   lat: z.coerce.number().min(-90).max(90).optional(),
   lng: z.coerce.number().min(-180).max(180).optional(),
   radiusKm: z.coerce.number().min(1).max(200).optional(),
+  size: z.enum(COURT_SIZE_SLUGS).optional(),
   sort: z.enum(["name", "distance", "price"]).optional(),
 });
 
@@ -213,6 +231,7 @@ export const onboardingSchema = z.object({
   defaultPrice: z.number().nonnegative(),
   peakPrice: z.number().nonnegative().optional(),
   peakStartsAt: hhmm.optional(),
+  weekendPrice: z.number().nonnegative().optional(),
 });
 
 export const createRecurringSeriesSchema = z
@@ -258,6 +277,7 @@ export type OperatingHourInput = z.infer<typeof operatingHourSchema>;
 export type CreateExceptionInput = z.infer<typeof createExceptionSchema>;
 export type CreatePricingRuleInput = z.infer<typeof createPricingRuleSchema>;
 export type UpdatePricingRuleInput = z.infer<typeof updatePricingRuleSchema>;
+export type ReplacePricingInput = z.infer<typeof replacePricingSchema>;
 export type CustomerInput = z.infer<typeof customerInputSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type UpdateBookingInput = z.infer<typeof updateBookingSchema>;

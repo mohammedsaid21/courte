@@ -6,6 +6,8 @@ import {
   OnboardingInput,
   UpdateResourceInput,
   UpdateVenueInput,
+  buildTierPricingRules,
+  courtSizeSlug,
 } from "@courte/shared";
 import { AccessService } from "../access/access.service";
 import { uniqueSlug, money } from "../common/util";
@@ -55,12 +57,15 @@ export class VenuesService {
     await this.access.assertOwnerAccount(user);
     const venue = await this.prisma.venue.create({
       data: {
-        slug: uniqueSlug(input.name),
+        slug: uniqueSlug(input.nameEn || input.name),
         name: input.name,
+        nameEn: input.nameEn,
         description: input.description,
+        descriptionEn: input.descriptionEn,
         phone: input.phone,
         whatsapp: input.whatsapp,
         address: input.address,
+        addressEn: input.addressEn,
         city: input.city,
         latitude: input.latitude ?? undefined,
         longitude: input.longitude ?? undefined,
@@ -88,12 +93,15 @@ export class VenuesService {
     const venue = await this.prisma.$transaction(async (tx) => {
       const created = await tx.venue.create({
         data: {
-          slug: uniqueSlug(input.venue.name),
+          slug: uniqueSlug(input.venue.nameEn || input.venue.name),
           name: input.venue.name,
+          nameEn: input.venue.nameEn,
           description: input.venue.description,
+          descriptionEn: input.venue.descriptionEn,
           phone: input.venue.phone,
           whatsapp: input.venue.whatsapp,
           address: input.venue.address,
+          addressEn: input.venue.addressEn,
           city: input.venue.city,
           latitude: input.venue.latitude ?? undefined,
           longitude: input.venue.longitude ?? undefined,
@@ -116,8 +124,14 @@ export class VenuesService {
         data: {
           venueId: created.id,
           name: input.resource.name,
+          nameEn: input.resource.nameEn,
           description: input.resource.description,
+          descriptionEn: input.resource.descriptionEn,
           venueTypeId: input.resource.venueTypeId,
+          size: input.resource.size,
+          surface: input.resource.surface,
+          setting: input.resource.setting,
+          hasLights: input.resource.hasLights ?? false,
           defaultDurationMinutes: input.resource.defaultDurationMinutes,
           slotIntervalMinutes: input.resource.slotIntervalMinutes,
           minDurationMinutes: input.resource.minDurationMinutes,
@@ -131,28 +145,12 @@ export class VenuesService {
             })),
           },
           pricingRules: {
-            create: [
-              {
-                name: "Day",
-                startsAt: "08:00",
-                endsAt: input.peakStartsAt ?? "16:00",
-                priceAmount: input.defaultPrice,
-                isDefault: true,
-                sortOrder: 0,
-              },
-              ...(input.peakPrice != null
-                ? [
-                    {
-                      name: "Evening",
-                      startsAt: input.peakStartsAt ?? "16:00",
-                      endsAt: "00:00",
-                      priceAmount: input.peakPrice,
-                      isDefault: false,
-                      sortOrder: 1,
-                    },
-                  ]
-                : []),
-            ],
+            create: buildTierPricingRules({
+              regularPrice: input.defaultPrice,
+              peakPrice: input.peakPrice,
+              peakStartsAt: input.peakStartsAt,
+              weekendPrice: input.weekendPrice,
+            }),
           },
         },
       });
@@ -191,13 +189,16 @@ export class VenuesService {
         where: { id: venueId },
         data: {
           name: input.name,
+          nameEn: input.nameEn,
           description: input.description,
+          descriptionEn: input.descriptionEn,
           phone: input.phone,
           whatsapp: input.whatsapp,
           address: input.address,
+          addressEn: input.addressEn,
           city: input.city,
-          latitude: input.latitude ?? undefined,
-          longitude: input.longitude ?? undefined,
+          latitude: input.latitude === undefined ? undefined : input.latitude,
+          longitude: input.longitude === undefined ? undefined : input.longitude,
           coverImageUrl: input.coverImageUrl,
           isActive: input.isActive,
           slug: input.slug,
@@ -237,10 +238,13 @@ export class VenuesService {
       id: venue.id,
       slug: venue.slug,
       name: venue.name,
+      nameEn: venue.nameEn,
       description: venue.description,
+      descriptionEn: venue.descriptionEn,
       phone: venue.phone,
       whatsapp: venue.whatsapp,
       address: venue.address,
+      addressEn: venue.addressEn,
       city: venue.city,
       latitude: venue.latitude ? Number(venue.latitude) : null,
       longitude: venue.longitude ? Number(venue.longitude) : null,
@@ -259,7 +263,14 @@ export class VenuesService {
         return {
           id: resource.id,
           name: resource.name,
+          nameEn: resource.nameEn,
           description: resource.description,
+          descriptionEn: resource.descriptionEn,
+          size: courtSizeSlug(resource.size),
+          sizeCode: resource.size,
+          surface: resource.surface,
+          setting: resource.setting,
+          hasLights: resource.hasLights,
           type: resource.venueType,
           defaultDurationMinutes: resource.defaultDurationMinutes,
           slotIntervalMinutes: resource.slotIntervalMinutes,
@@ -268,6 +279,7 @@ export class VenuesService {
           hours: resource.operatingHours,
           pricing: resource.pricingRules.map((rule) => ({
             name: rule.name,
+            dayOfWeek: rule.dayOfWeek,
             startsAt: rule.startsAt,
             endsAt: rule.endsAt,
             priceAmount: money(rule.priceAmount),
@@ -307,8 +319,14 @@ export class VenuesService {
       data: {
         venueId,
         name: input.name,
+        nameEn: input.nameEn,
         description: input.description,
+        descriptionEn: input.descriptionEn,
         venueTypeId: input.venueTypeId,
+        size: input.size,
+        surface: input.surface,
+        setting: input.setting,
+        hasLights: input.hasLights ?? false,
         defaultDurationMinutes: input.defaultDurationMinutes ?? venue.defaultDurationMinutes,
         slotIntervalMinutes: input.slotIntervalMinutes ?? venue.defaultDurationMinutes,
         minDurationMinutes: input.minDurationMinutes,
@@ -339,8 +357,14 @@ export class VenuesService {
       where: { id: resourceId },
       data: {
         name: input.name,
+        nameEn: input.nameEn,
         description: input.description,
+        descriptionEn: input.descriptionEn,
         venueTypeId: input.venueTypeId,
+        size: input.size,
+        surface: input.surface,
+        setting: input.setting,
+        hasLights: input.hasLights,
         defaultDurationMinutes: input.defaultDurationMinutes,
         slotIntervalMinutes: input.slotIntervalMinutes,
         minDurationMinutes: input.minDurationMinutes,
@@ -357,10 +381,13 @@ export class VenuesService {
       id: string;
       slug: string;
       name: string;
+      nameEn: string | null;
       description: string | null;
+      descriptionEn: string | null;
       phone: string;
       whatsapp: string | null;
       address: string;
+      addressEn: string | null;
       city: string;
       latitude: { toString(): string } | null;
       longitude: { toString(): string } | null;
@@ -383,10 +410,13 @@ export class VenuesService {
       id: venue.id,
       slug: venue.slug,
       name: venue.name,
+      nameEn: venue.nameEn,
       description: venue.description,
+      descriptionEn: venue.descriptionEn,
       phone: venue.phone,
       whatsapp: venue.whatsapp,
       address: venue.address,
+      addressEn: venue.addressEn,
       city: venue.city,
       latitude: venue.latitude ? Number(venue.latitude) : null,
       longitude: venue.longitude ? Number(venue.longitude) : null,

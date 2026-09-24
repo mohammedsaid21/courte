@@ -22,7 +22,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${window.location.origin}/verify?email=${encodeURIComponent(email)}`,
         data: { full_name: fullName, account_kind: "OWNER" },
       },
     });
@@ -36,13 +36,8 @@ export default function SignupPage() {
       router.replace("/login");
       return;
     }
-    if (!data.session) {
-      toast.success("تم إنشاء الحساب. تحقق من بريدك ثم سجّل الدخول.");
-      router.replace("/login");
-      return;
-    }
-    toast.success("تم إنشاء الحساب وتسجيل الدخول.");
-    router.replace("/onboarding");
+    toast.success("تم إرسال رمز التأكيد إلى بريدك.");
+    router.replace(`/verify?email=${encodeURIComponent(email)}`);
   }
 
   return (

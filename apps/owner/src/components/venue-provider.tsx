@@ -31,8 +31,12 @@ export function VenueProvider({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
+    const storedId = getStoredVenueId();
     try {
-      const profile = await ownerApi.me();
+      const [profile, storedVenue] = await Promise.all([
+        ownerApi.me(),
+        storedId ? ownerApi.venue(storedId).catch(() => null) : Promise.resolve(null),
+      ]);
       setMe(profile);
       if (profile.accountKind === "CUSTOMER" && profile.venues.length === 0) {
         router.replace("/owner-only");
@@ -45,19 +49,22 @@ export function VenueProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const selected =
-        getStoredVenueId() && profile.venues.some((item) => item.id === getStoredVenueId())
-          ? getStoredVenueId()!
+        storedVenue && profile.venues.some((item) => item.id === storedVenue.id)
+          ? storedVenue.id
           : profile.venues[0].id;
       setStoredVenueId(selected);
-      const details = await ownerApi.venue(selected);
-      setVenue(details);
+      setVenue(
+        storedVenue && storedVenue.id === selected
+          ? storedVenue
+          : await ownerApi.venue(selected),
+      );
       setLoading(false);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         router.replace("/login");
         return;
       }
-      toast.error(error instanceof Error ? error.message : "Could not load your account");
+      toast.error(error instanceof Error ? error.message : "تعذر تحميل الحساب");
       setLoading(false);
     }
   }

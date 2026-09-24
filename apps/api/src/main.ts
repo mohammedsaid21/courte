@@ -8,11 +8,14 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const origin = config.get<string>("FRONTEND_ORIGIN") ?? "http://localhost:3000";
   app.enableCors({
-    origin: origin.split(",").map((item) => item.trim()),
+    origin: origin
+      .split(",")
+      .map((item) => item.trim().replace(/\/+$/, ""))
+      .filter(Boolean),
     credentials: true,
   });
   app.setGlobalPrefix("api");
-  const port = Number(config.get("PORT") ?? 3001);
+  const port = Number(process.env.PORT ?? config.get("PORT") ?? 3001);
   await app.listen(port);
 }
 

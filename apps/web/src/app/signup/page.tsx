@@ -6,7 +6,6 @@ import { FormEvent, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { AuthFrame } from "@/components/auth-frame";
 import { Button, Field, Input } from "@/components/ui";
-import { customerService } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 function SignupForm() {
@@ -26,25 +25,26 @@ function SignupForm() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, phone, account_kind: "CUSTOMER" } },
+      options: {
+        emailRedirectTo: `${window.location.origin}/verify?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`,
+        data: { full_name: fullName, phone, account_kind: "CUSTOMER" },
+      },
     });
     if (error) {
       setLoading(false);
       toast.error(error.message.includes("already") ? "يوجد حساب بهذا البريد. جرّب الدخول." : "تعذر إنشاء الحساب.");
       return;
     }
-    if (data.session) {
-      try {
-        await customerService.updateProfile({ fullName, phone });
-      } catch {
-        // Profile can be completed after sign-in if confirmation is required.
-      }
-      router.replace(next.startsWith("/") ? next : "/account/bookings");
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      setLoading(false);
+      toast.error("يوجد حساب بهذا البريد. جرّب الدخول.");
+      router.replace(`/login?next=${encodeURIComponent(next)}`);
       return;
     }
+    sessionStorage.setItem("courte.pending-signup", JSON.stringify({ fullName, phone }));
     setLoading(false);
-    toast.success("تم إنشاء الحساب. إذا كان التأكيد مطلوبًا، راجع بريدك ثم ادخل.");
-    router.replace(`/login?next=${encodeURIComponent(next)}`);
+    toast.success("تم إرسال رمز التأكيد إلى بريدك.");
+    router.replace(`/verify?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
   }
 
   return (

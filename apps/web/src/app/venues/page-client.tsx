@@ -34,6 +34,7 @@ export default function VenuesPage() {
       typeId: params.get("typeId") ?? undefined,
       date: params.get("date") ?? undefined,
       time: params.get("time") ?? undefined,
+      size: (params.get("size") as DiscoverVenue["sizes"][number] | null) ?? undefined,
       minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : undefined,
       maxPrice: params.get("maxPrice") ? Number(params.get("maxPrice")) : undefined,
     }),

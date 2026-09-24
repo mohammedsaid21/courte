@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { venueService, type CatalogItem } from "@/lib/api";
 import { todayYmd } from "@/lib/utils";
-import { cityAr } from "@/lib/ar";
+import { COURT_SIZES, catalogName, cityAr } from "@/lib/ar";
 import { Button } from "./ui";
 import { cn } from "@/lib/utils";
 
@@ -13,13 +13,14 @@ export function SearchPanel({
   initial,
   compact = false,
 }: {
-  initial?: { q?: string; city?: string; typeId?: string; date?: string; time?: string };
+  initial?: { q?: string; city?: string; typeId?: string; date?: string; time?: string; size?: string };
   compact?: boolean;
 }) {
   const router = useRouter();
   const [types, setTypes] = useState<CatalogItem[]>([]);
   const [city, setCity] = useState(initial?.city ?? "");
   const [typeId, setTypeId] = useState(initial?.typeId ?? "");
+  const [size, setSize] = useState(initial?.size ?? "");
   const [date, setDate] = useState(initial?.date ?? "");
   const [time, setTime] = useState(initial?.time ?? "");
 
@@ -33,6 +34,7 @@ export function SearchPanel({
     if (initial?.q?.trim()) params.set("q", initial.q.trim());
     if (city) params.set("city", city);
     if (typeId) params.set("typeId", typeId);
+    if (size) params.set("size", size);
     if (date) params.set("date", date);
     if (time) params.set("time", time.slice(0, 5));
     router.push(`/venues${params.toString() ? `?${params}` : ""}`);
@@ -41,7 +43,7 @@ export function SearchPanel({
   return (
     <form
       onSubmit={submit}
-      className={cn("glass grid gap-0 overflow-hidden rounded-[12px]", compact ? "md:grid-cols-[1fr_1fr_1fr_1fr_auto]" : "md:grid-cols-[1.1fr_1.1fr_1fr_1fr_auto]")}
+      className={cn("glass grid gap-0 overflow-hidden rounded-[12px]", compact ? "md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" : "md:grid-cols-[1.1fr_1.1fr_1fr_1fr_1fr_auto]")}
     >
       <SearchField label="المدينة">
         <select className="h-12 w-full border-0 bg-transparent text-text outline-none" value={city} onChange={(event) => setCity(event.target.value)}>
@@ -58,7 +60,17 @@ export function SearchPanel({
           <option value="">كل الأنواع</option>
           {types.map((type) => (
             <option key={type.id} value={type.id}>
-              {type.name}
+                  {catalogName(type)}
+                </option>
+          ))}
+        </select>
+      </SearchField>
+      <SearchField label="حجم الملعب">
+        <select className="h-12 w-full border-0 bg-transparent text-text outline-none" value={size} onChange={(event) => setSize(event.target.value)}>
+          <option value="">كل الأحجام</option>
+          {COURT_SIZES.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
             </option>
           ))}
         </select>
@@ -100,11 +112,11 @@ export function SportFilter({
   value,
   onChange,
 }: {
-  types: { id: string; name: string }[];
+  types: { id: string; name: string; nameAr?: string | null }[];
   value?: string;
   onChange: (typeId: string) => void;
 }) {
-  const items = [{ id: "", name: "الكل" }, ...types];
+  const items = [{ id: "", name: "الكل", nameAr: "الكل" }, ...types];
   return (
     <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
       {items.map((item) => {
@@ -119,7 +131,7 @@ export function SportFilter({
               active ? "bg-pitch text-white" : "bg-white text-text hover:bg-pitch-light",
             )}
           >
-            {item.name}
+            {item.nameAr?.trim() || item.name}
           </button>
         );
       })}

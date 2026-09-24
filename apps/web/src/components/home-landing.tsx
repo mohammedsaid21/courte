@@ -1,12 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarCheck, CircleDot, MapPin, Star, Timer, Trophy, X } from "lucide-react";
 import { COURT_SIZES, HOME_CITIES } from "@/lib/ar";
 import { BOOKING_TIMES, FEATURED_COURTS, type FeaturedCourt } from "@/lib/featured-courts";
 import { OWNER_APP_URL, todayYmd } from "@/lib/utils";
 
 export function HomeLanding() {
+  const router = useRouter();
   const [city, setCity] = useState("");
   const [size, setSize] = useState("");
   const [date, setDate] = useState("");
@@ -24,8 +26,12 @@ export function HomeLanding() {
 
   function search(event: FormEvent) {
     event.preventDefault();
-    setFilter(size || "all");
-    document.getElementById("venues")?.scrollIntoView({ behavior: "smooth" });
+    const params = new URLSearchParams();
+    const cityEn = HOME_CITIES.find((item) => item.ar === city)?.en;
+    if (cityEn) params.set("city", cityEn);
+    if (size) params.set("size", size);
+    if (date) params.set("date", date);
+    router.push(`/venues${params.toString() ? `?${params}` : ""}`);
   }
 
   return (

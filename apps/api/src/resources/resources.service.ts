@@ -4,6 +4,7 @@ import {
   CreateExceptionInput,
   CreatePricingRuleInput,
   OperatingHourInput,
+  ReplacePricingInput,
   UpdatePricingRuleInput,
 } from "@courte/shared";
 import { AccessService } from "../access/access.service";
@@ -131,6 +132,27 @@ export class ResourcesService {
     await this.access.assertResourceAccess(user, rule.resourceId);
     await this.prisma.pricingRule.delete({ where: { id: ruleId } });
     return { ok: true };
+  }
+
+  async replacePricing(user: User, resourceId: string, input: ReplacePricingInput) {
+    await this.access.assertResourceAccess(user, resourceId, ["OWNER", "MANAGER"]);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.pricingRule.deleteMany({ where: { resourceId } });
+      if (input.rules.length === 0) return;
+      await tx.pricingRule.createMany({
+        data: input.rules.map((rule, index) => ({
+          resourceId,
+          name: rule.name,
+          dayOfWeek: rule.dayOfWeek,
+          startsAt: rule.startsAt,
+          endsAt: rule.endsAt,
+          priceAmount: rule.priceAmount,
+          isDefault: rule.isDefault,
+          sortOrder: rule.sortOrder ?? index,
+        })),
+      });
+    });
+    return this.listPricing(user, resourceId);
   }
 
   private serialize(resource: {

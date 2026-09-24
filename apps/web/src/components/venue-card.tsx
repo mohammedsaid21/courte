@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/utils";
-import { cityAr } from "@/lib/ar";
+import { COURT_SIZES, cityAr } from "@/lib/ar";
 import type { DiscoverVenue } from "@/lib/api";
 import { VenuePlaceholder } from "./court-field";
 
 export function VenueCard({ venue }: { venue: DiscoverVenue }) {
-  const sport = venue.types[0]?.name ?? "كرة قدم";
+  const sport = venue.types[0]?.nameAr || venue.types[0]?.name || "كرة قدم";
+  const size = venue.sizes?.[0];
+  const sizeLabel = COURT_SIZES.find((item) => item.id === size)?.label;
 
   return (
     <Link href={`/venues/${venue.slug}`} className="group block overflow-hidden rounded-[12px] border border-white/80 bg-white shadow-glass">
@@ -29,6 +31,7 @@ export function VenueCard({ venue }: { venue: DiscoverVenue }) {
           <h2 className="font-display text-lg font-extrabold">{venue.name}</h2>
           <p className="mt-0.5 text-sm font-medium text-text-muted">
             {sport} · {cityAr(venue.city)}
+            {sizeLabel ? ` · ${sizeLabel}` : ""}
           </p>
         </div>
         {venue.startingPrice != null && (

@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { buildTierPricingRules, PRICING_RULE_NAMES } from "@courte/shared";
 import { EmptyState } from "@/components/empty-state";
 import { ResourcePills } from "@/components/page-header";
 import { useVenue } from "@/components/venue-provider";
@@ -13,10 +14,33 @@ export default function PricingPage() {
   const { venue } = useVenue();
   const [resourceId, setResourceId] = useState("");
   const [rules, setRules] = useState<PricingRule[]>([]);
-  const [form, setForm] = useState({ name: "Evening", startsAt: "16:00", endsAt: "23:00", priceAmount: 40, isDefault: false });
+  const [regularPrice, setRegularPrice] = useState(50);
+  const [peakPrice, setPeakPrice] = useState(70);
+  const [peakStartsAt, setPeakStartsAt] = useState("16:00");
+  const [weekendPrice, setWeekendPrice] = useState(80);
+  const [hasPeak, setHasPeak] = useState(true);
+  const [hasWeekend, setHasWeekend] = useState(true);
 
   async function load(id: string) {
-    setRules(await ownerApi.pricing(id));
+    const next = await ownerApi.pricing(id);
+    setRules(next);
+    const regular = next.find((rule) => rule.name === PRICING_RULE_NAMES.REGULAR) ?? next.find((rule) => rule.isDefault);
+    const peak = next.find((rule) => rule.name === PRICING_RULE_NAMES.PEAK);
+    const weekend = next.find((rule) => rule.name === PRICING_RULE_NAMES.WEEKEND);
+    if (regular) setRegularPrice(regular.priceAmount);
+    if (peak) {
+      setHasPeak(true);
+      setPeakPrice(peak.priceAmount);
+      setPeakStartsAt(peak.startsAt);
+    } else {
+      setHasPeak(false);
+    }
+    if (weekend) {
+      setHasWeekend(true);
+      setWeekendPrice(weekend.priceAmount);
+    } else {
+      setHasWeekend(false);
+    }
   }
 
   useEffect(() => {
@@ -25,25 +49,49 @@ export default function PricingPage() {
     void load(venue.resources[0].id);
   }, [venue?.id]);
 
+  const grouped = useMemo(() => {
+    const weekend = rules.filter((rule) => rule.name === PRICING_RULE_NAMES.WEEKEND);
+    const rest = rules.filter((rule) => rule.name !== PRICING_RULE_NAMES.WEEKEND);
+    return [
+      ...rest,
+      weekend[0]
+        ? {
+            ...weekend[0],
+            id: weekend.map((item) => item.id).join(","),
+            startsAt: "الجمعة والسبت",
+            endsAt: "",
+          }
+        : null,
+    ].filter(Boolean) as PricingRule[];
+  }, [rules]);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    await ownerApi.createPricing(resourceId, form);
-    setForm({ name: "", startsAt: "08:00", endsAt: "16:00", priceAmount: 30, isDefault: false });
+    const nextRules = buildTierPricingRules({
+      regularPrice: Number(regularPrice),
+      peakPrice: hasPeak ? Number(peakPrice) : null,
+      peakStartsAt,
+      weekendPrice: hasWeekend ? Number(weekendPrice) : null,
+    });
+    await ownerApi.replacePricing(resourceId, { rules: nextRules });
     await load(resourceId);
-    toast.success("Price added");
+    toast.success("تم حفظ الأسعار");
   }
 
   if (!venue) return null;
   if (venue.resources.length === 0) {
     return (
       <EmptyState
-        title="Add your first field/court"
-        body="Set a default price and evening price for each resource."
+        title="أضف أول ملعب"
+        body="حدد سعر الأوقات العادية والذروة وعطلة نهاية الأسبوع لكل مساحة."
         href="/venue/resources"
-        action="Add a resource"
+        action="إضافة ملعب"
       />
     );
   }
+
+  const resource = venue.resources.find((item) => item.id === resourceId) ?? venue.resources[0];
+  const unit = resource.defaultDurationMinutes === 90 ? "ساعة ونصف" : "ساعة";
 
   return (
     <div className="space-y-4">
@@ -59,41 +107,58 @@ export default function PricingPage() {
         <div className="text-sm font-black text-slate-700">{venue.resources[0].name}</div>
       )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {rules.map((rule) => (
-          <Card key={rule.id} className="flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-black uppercase tracking-wider text-slate-400">{rule.name}</div>
-                {rule.isDefault && <span className="rounded-lg bg-brand px-2 py-1 text-[10px] font-black text-slate-900">DEFAULT</span>}
-              </div>
-              <div className="mt-3 text-4xl font-black text-slate-900">{formatMoney(rule.priceAmount)}</div>
-              <div className="mt-1 text-sm font-bold text-slate-500">{rule.startsAt} – {rule.endsAt}</div>
+        {grouped.map((rule) => (
+          <Card key={rule.id}>
+            <div className="text-xs font-black uppercase tracking-wider text-slate-400">
+              {rule.name === PRICING_RULE_NAMES.REGULAR
+                ? "أوقات عادية"
+                : rule.name === PRICING_RULE_NAMES.PEAK
+                  ? "أوقات الذروة"
+                  : rule.name === PRICING_RULE_NAMES.WEEKEND
+                    ? "عطلة نهاية الأسبوع"
+                    : rule.name}
             </div>
-            <Button
-              variant="ghost"
-              className="mt-4 self-start px-0 text-red-600 hover:bg-transparent hover:text-red-700"
-              onClick={async () => { await ownerApi.deletePricing(rule.id); await load(resourceId); }}
-            >
-              Remove
-            </Button>
+            <div className="mt-3 text-4xl font-black text-slate-900">{formatMoney(rule.priceAmount)}</div>
+            <div className="mt-1 text-sm font-bold text-slate-500">
+              {rule.name === PRICING_RULE_NAMES.WEEKEND
+                ? "الجمعة والسبت"
+                : `${rule.startsAt}${rule.endsAt ? ` – ${rule.endsAt}` : ""}`}
+              {" "}· لكل {unit}
+            </div>
           </Card>
         ))}
       </div>
       <Card>
-        <h2 className="text-lg font-black text-slate-900">Add a price</h2>
-        <p className="mb-5 mt-1 text-sm font-medium text-slate-500">Day, evening, or a default rate for this space.</p>
-        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={onSubmit}>
-          <Field label="Name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label="From"><Input value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></Field>
-          <Field label="To"><Input value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></Field>
-          <Field label="Price (JOD)"><Input type="number" value={form.priceAmount} onChange={(e) => setForm({ ...form, priceAmount: Number(e.target.value) })} /></Field>
-          <div className="flex items-end gap-3">
-            <label className="flex h-11 items-center gap-2 text-sm font-bold text-slate-600">
-              <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} />
-              Default
-            </label>
-            <Button>Add</Button>
+        <h2 className="text-lg font-black text-slate-900">تحديد السعر حسب الوقت</h2>
+        <p className="mb-5 mt-1 text-sm font-medium text-slate-500">
+          السعر لكل {unit}. يمكن تمييز أوقات الذروة وعطلة نهاية الأسبوع.
+        </p>
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label={`أوقات عادية (₪ / ${unit})`}>
+              <Input type="number" min={0} value={regularPrice} onChange={(e) => setRegularPrice(Number(e.target.value))} />
+            </Field>
+            <Field label="بداية الذروة">
+              <Input type="time" value={peakStartsAt} onChange={(e) => setPeakStartsAt(e.target.value)} disabled={!hasPeak} />
+            </Field>
+            <Field label={`أوقات الذروة (₪ / ${unit})`}>
+              <Input type="number" min={0} value={peakPrice} onChange={(e) => setPeakPrice(Number(e.target.value))} disabled={!hasPeak} />
+            </Field>
+            <Field label={`عطلة نهاية الأسبوع (₪ / ${unit})`}>
+              <Input type="number" min={0} value={weekendPrice} onChange={(e) => setWeekendPrice(Number(e.target.value))} disabled={!hasWeekend} />
+            </Field>
           </div>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <input type="checkbox" checked={hasPeak} onChange={(e) => setHasPeak(e.target.checked)} />
+              سعر ذروة منفصل
+            </label>
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <input type="checkbox" checked={hasWeekend} onChange={(e) => setHasWeekend(e.target.checked)} />
+              سعر الجمعة والسبت
+            </label>
+          </div>
+          <Button>حفظ الأسعار</Button>
         </form>
       </Card>
     </div>

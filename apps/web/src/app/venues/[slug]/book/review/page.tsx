@@ -29,7 +29,7 @@ export default function ReviewBookingPage() {
   const { slug } = useParams<{ slug: string }>();
   const search = useSearchParams();
   const router = useRouter();
-  const { session, me, loading } = useSession();
+  const { session, me, loading, profileLoading } = useSession();
   const [venue, setVenue] = useState<PublicVenue | null>(null);
   const [slot, setSlot] = useState<AvailabilitySlot | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -78,7 +78,7 @@ export default function ReviewBookingPage() {
   if (!start || !end || !resourceId) {
     return <EmptyState title="تفاصيل الحجز ناقصة" body="اختر وقتًا أولاً." href={`/venues/${slug}/book`} action="اختر وقتًا" />;
   }
-  if (loading || !session) {
+  if (loading || profileLoading || !session) {
     return <Skeleton className="h-64 w-full" />;
   }
   if (!venue) {

@@ -15,7 +15,8 @@
     "test": "pnpm --filter @courte/api test",
     "db:generate": "pnpm --filter @courte/api prisma:generate",
     "db:migrate": "pnpm --filter @courte/api prisma:migrate",
-    "db:seed": "pnpm --filter @courte/api prisma:seed"
+    "db:seed": "pnpm --filter @courte/api prisma:seed",
+    "docker:api": "docker build -f apps/api/Dockerfile -t courte-api ."
   },
   "engines": {
     "node": ">=20"

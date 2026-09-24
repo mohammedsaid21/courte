@@ -92,3 +92,10 @@ body {
   background: #3ddb7a;
   border-radius: 999px;
 }
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  font-family: inherit;
+}

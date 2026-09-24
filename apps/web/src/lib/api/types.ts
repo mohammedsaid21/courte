@@ -26,6 +26,7 @@ export type DiscoverQuery = {
   lat?: number;
   lng?: number;
   radiusKm?: number;
+  size?: "5v5" | "7v7" | "11v11";
   sort?: "name" | "distance" | "price";
   page?: number;
   pageSize?: number;
@@ -35,10 +36,14 @@ export type DiscoverVenue = {
   id: string;
   slug: string;
   name: string;
+  nameEn?: string | null;
   city: string;
   address: string;
+  addressEn?: string | null;
   coverImageUrl: string | null;
   types: CatalogItem[];
+  sizes: ("5v5" | "7v7" | "11v11")[];
+  surfaces: ("NATURAL_GRASS" | "ARTIFICIAL_GRASS")[];
   startingPrice: number | null;
   currency: string;
   open: boolean;
@@ -59,7 +64,14 @@ export type DiscoverResponse = {
 export type PublicResource = {
   id: string;
   name: string;
+  nameEn: string | null;
   description: string | null;
+  descriptionEn: string | null;
+  size: "5v5" | "7v7" | "11v11" | null;
+  sizeCode: "FIVE_V_FIVE" | "SEVEN_V_SEVEN" | "ELEVEN_V_ELEVEN" | null;
+  surface: "NATURAL_GRASS" | "ARTIFICIAL_GRASS" | null;
+  setting: "INDOOR" | "OUTDOOR" | null;
+  hasLights: boolean;
   type: CatalogItem | null;
   defaultDurationMinutes: number;
   slotIntervalMinutes: number;
@@ -68,6 +80,7 @@ export type PublicResource = {
   hours: { dayOfWeek: number; opensAt: string; closesAt: string; isClosed: boolean }[];
   pricing: {
     name: string;
+    dayOfWeek: number | null;
     startsAt: string;
     endsAt: string;
     priceAmount: number;
@@ -80,10 +93,13 @@ export type PublicVenue = {
   id: string;
   slug: string;
   name: string;
+  nameEn: string | null;
   description: string | null;
+  descriptionEn: string | null;
   phone: string;
   whatsapp: string | null;
   address: string;
+  addressEn: string | null;
   city: string;
   latitude: number | null;
   longitude: number | null;
