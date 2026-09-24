@@ -18,7 +18,7 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY apps/api/prisma apps/api/prisma
 ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build"
 ENV DIRECT_URL="postgresql://build:build@127.0.0.1:5432/build"
-RUN corepack prepare pnpm@12.4.2 --activate \
+RUN corepack prepare pnpm@10.34.5 --activate \
   && pnpm install --frozen-lockfile --filter @courte/api...
 
 COPY packages/shared packages/shared

@@ -2,7 +2,7 @@
   "name": "courte",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@12.4.2",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm run build:shared && pnpm -r --parallel --stream run dev",
     "dev:api": "pnpm run build:shared && pnpm --filter @courte/api start:dev",
@@ -20,5 +20,14 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "prisma",
+      "unrs-resolver"
+    ]
   }
 }
