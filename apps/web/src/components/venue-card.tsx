@@ -1,26 +1,29 @@
 import Link from "next/link";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, venueCoverUrl } from "@/lib/utils";
 import { COURT_SIZES, cityAr } from "@/lib/ar";
 import type { DiscoverVenue } from "@/lib/api";
 import { VenuePlaceholder } from "./court-field";
 
 export function VenueCard({ venue }: { venue: DiscoverVenue }) {
-  const sport = venue.types[0]?.nameAr || venue.types[0]?.name || "كرة قدم";
+  const sport =
+    venue.types.map((type) => type.nameAr || type.name).filter(Boolean).join(" · ") || "رياضة";
   const size = venue.sizes?.[0];
   const sizeLabel = COURT_SIZES.find((item) => item.id === size)?.label;
+
+  const imageUrl = venueCoverUrl(venue);
 
   return (
     <Link href={`/venues/${venue.slug}`} className="group block overflow-hidden rounded-[12px] border border-white/80 bg-white shadow-glass">
       <div className="relative aspect-[16/10] overflow-hidden bg-pitch-light">
-        {venue.coverImageUrl ? (
+        {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={venue.coverImageUrl}
+            src={imageUrl}
             alt={venue.name}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         ) : (
-          <VenuePlaceholder name="" className="h-full w-full" />
+          <VenuePlaceholder name={venue.name} className="h-full w-full" />
         )}
         <div className="absolute start-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold text-pitch backdrop-blur">
           {venue.open ? "مفتوح الآن" : venue.hoursLabel || "ساعات متفاوتة"}

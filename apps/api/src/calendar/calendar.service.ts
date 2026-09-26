@@ -150,7 +150,7 @@ export class CalendarService {
         pricingRules: true,
       },
     });
-    if (!resource || !resource.venue.isActive) {
+    if (!resource || !resource.venue.isActive || !resource.venue.acceptsOnlineBooking) {
       throw new NotFoundException("Resource not found");
     }
 

@@ -19,6 +19,6 @@ export const venueService = {
   },
   getBySlug: (slug: string) =>
     publicApi<PublicVenue>(`/venues/public/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
     }),
 };

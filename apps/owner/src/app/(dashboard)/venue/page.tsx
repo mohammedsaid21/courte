@@ -4,14 +4,17 @@ import { SPEC_AMENITY_SLUGS, WEST_BANK_CITIES } from "@courte/shared";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { CourtSettings } from "@/components/court-settings";
 import { MapPicker } from "@/components/map-picker";
 import { useVenue } from "@/components/venue-provider";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui";
+import { uploadVenuePhoto } from "@/lib/upload-venue-photo";
 import { CatalogItem, ownerApi } from "@/lib/api";
 import { CITY_AR, catalogName } from "@/lib/ar";
+import { CUSTOMER_SITE_URL } from "@/lib/utils";
 
 export default function VenueProfilePage() {
-  const { venue, refresh } = useVenue();
+  const { venue, refresh, replaceVenue } = useVenue();
   const [types, setTypes] = useState<CatalogItem[]>([]);
   const [amenities, setAmenities] = useState<CatalogItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -32,6 +35,7 @@ export default function VenueProfilePage() {
     venueTypeIds: [] as string[],
     amenityIds: [] as string[],
     isActive: true,
+    acceptsOnlineBooking: true,
   });
 
   const extraAmenities = useMemo(
@@ -47,7 +51,7 @@ export default function VenueProfilePage() {
   }, []);
 
   useEffect(() => {
-    if (!venue) return;
+    if (!venue || uploading) return;
     setForm({
       name: venue.name,
       nameEn: venue.nameEn ?? "",
@@ -65,8 +69,27 @@ export default function VenueProfilePage() {
       venueTypeIds: venue.types.map((item) => item.id),
       amenityIds: venue.amenities.map((item) => item.id),
       isActive: venue.isActive,
+      acceptsOnlineBooking: venue.acceptsOnlineBooking,
     });
-  }, [venue]);
+  }, [venue, uploading]);
+
+  function applyVenuePhotos(updated: { coverImageUrl: string | null; photos: { url: string }[] }) {
+    setForm((current) => ({
+      ...current,
+      coverImageUrl: updated.coverImageUrl ?? "",
+      photoUrls: updated.photos.map((photo) => photo.url),
+    }));
+  }
+
+  async function persistPhotos(coverImageUrl: string, photoUrls: string[]) {
+    if (!venue) return;
+    const updated = await ownerApi.updateVenue(venue.id, {
+      coverImageUrl: coverImageUrl || null,
+      photoUrls,
+    });
+    replaceVenue(updated);
+    applyVenuePhotos(updated);
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -88,6 +111,7 @@ export default function VenueProfilePage() {
       venueTypeIds: form.venueTypeIds,
       amenityIds: form.amenityIds,
       isActive: form.isActive,
+      acceptsOnlineBooking: form.acceptsOnlineBooking,
     });
     await refresh();
     toast.success("تم حفظ بيانات الملعب");
@@ -97,21 +121,16 @@ export default function VenueProfilePage() {
     if (!venue) return;
     setUploading(true);
     try {
+      let coverImageUrl = form.coverImageUrl;
+      let photoUrls = [...form.photoUrls];
       for (const file of Array.from(files)) {
-        const { signedUrl, publicUrl } = await ownerApi.upload(venue.id, file.type);
-        const response = await fetch(signedUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!response.ok) throw new Error("فشل رفع الصورة");
-        setForm((current) => ({
-          ...current,
-          coverImageUrl: current.coverImageUrl || publicUrl,
-          photoUrls: current.photoUrls.includes(publicUrl) ? current.photoUrls : [...current.photoUrls, publicUrl],
-        }));
+        const { publicUrl } = await uploadVenuePhoto(venue.id, file);
+        if (!photoUrls.includes(publicUrl)) photoUrls = [...photoUrls, publicUrl];
+        if (!coverImageUrl) coverImageUrl = publicUrl;
       }
-      toast.success("تم رفع الصور. احفظ ل تثبيتها.");
+      setForm((current) => ({ ...current, coverImageUrl, photoUrls }));
+      await persistPhotos(coverImageUrl, photoUrls);
+      toast.success("تم رفع الصور وستظهر في صفحة الزبائن.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر رفع الصورة");
     } finally {
@@ -119,9 +138,32 @@ export default function VenueProfilePage() {
     }
   }
 
+  async function setCover(url: string) {
+    const next = { ...form, coverImageUrl: url };
+    setForm(next);
+    try {
+      await persistPhotos(url, next.photoUrls);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر حفظ الغلاف");
+    }
+  }
+
+  async function removePhoto(url: string) {
+    const photoUrls = form.photoUrls.filter((item) => item !== url);
+    const coverImageUrl = form.coverImageUrl === url ? photoUrls[0] ?? "" : form.coverImageUrl;
+    const next = { ...form, photoUrls, coverImageUrl };
+    setForm(next);
+    try {
+      await persistPhotos(coverImageUrl, photoUrls);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر حذف الصورة");
+    }
+  }
+
   if (!venue) return null;
 
   return (
+    <div className="space-y-5">
     <form className="space-y-5" onSubmit={onSubmit}>
       <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -139,8 +181,9 @@ export default function VenueProfilePage() {
           </button>
           <Link
             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:border-brand"
-            href={`/venues/${venue.slug}`}
+            href={`${CUSTOMER_SITE_URL}/venues/${venue.slug}`}
             target="_blank"
+            rel="noreferrer"
           >
             معاينة
           </Link>
@@ -205,7 +248,9 @@ export default function VenueProfilePage() {
 
       <Card>
         <h2 className="text-lg font-black text-slate-900">صور الملعب</h2>
-        <p className="mb-4 mt-1 text-sm font-medium text-slate-500">ارفع صورة أو أكثر. اضغط على صورة لجعلها الغلاف.</p>
+        <p className="mb-4 mt-1 text-sm font-medium text-slate-500">
+          ارفع صورة أو أكثر. تُحفظ تلقائياً وتظهر في صفحة الزبائن. اضغط على صورة لجعلها الغلاف.
+        </p>
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -226,7 +271,7 @@ export default function VenueProfilePage() {
               <button
                 type="button"
                 className={`overflow-hidden rounded-2xl border-2 ${form.coverImageUrl === url ? "border-brand shadow-brand" : "border-slate-200"}`}
-                onClick={() => setForm({ ...form, coverImageUrl: url })}
+                onClick={() => void setCover(url)}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="h-24 w-full object-cover" />
@@ -234,19 +279,27 @@ export default function VenueProfilePage() {
               <button
                 type="button"
                 className="absolute end-1 top-1 rounded-lg bg-white/90 px-2 py-1 text-[11px] font-black text-red-600"
-                onClick={() =>
-                  setForm((current) => ({
-                    ...current,
-                    photoUrls: current.photoUrls.filter((item) => item !== url),
-                    coverImageUrl: current.coverImageUrl === url ? current.photoUrls.find((item) => item !== url) ?? "" : current.coverImageUrl,
-                  }))
-                }
+                onClick={() => void removePhoto(url)}
               >
                 حذف
               </button>
             </div>
           ))}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-lg font-black text-slate-900">الحجز عبر الموقع</h2>
+        <p className="mb-4 mt-1 text-sm font-medium text-slate-500">
+          إذا أوقفت الحجز، يظهر الملعب للزبائن مع الهاتف والعنوان فقط بدون أوقات على الموقع.
+        </p>
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, acceptsOnlineBooking: !form.acceptsOnlineBooking })}
+          className={`rounded-xl px-4 py-2.5 text-sm font-black ${form.acceptsOnlineBooking ? "bg-brand text-slate-900 shadow-brand" : "bg-slate-100 text-slate-500"}`}
+        >
+          {form.acceptsOnlineBooking ? "الحجز مفعّل على الموقع" : "عرض فقط — بدون حجز أونلاين"}
+        </button>
       </Card>
 
       <Card>
@@ -275,7 +328,7 @@ export default function VenueProfilePage() {
 
       <Card>
         <h2 className="text-lg font-black text-slate-900">مرافق إضافية</h2>
-        <p className="mb-4 mt-1 text-sm font-medium text-slate-500">مواقف، غرف تبديل، كافتيريا وغيرها. حجم الملعب والعشب والإنارة تُحدد من صفحة المساحات.</p>
+        <p className="mb-4 mt-1 text-sm font-medium text-slate-500">مواقف، غرف تبديل، كافتيريا وغيرها. حجم الملعب والعشب والإنارة في القسم التالي.</p>
         <div className="flex flex-wrap gap-2">
           {extraAmenities.map((amenity) => (
             <button
@@ -299,5 +352,7 @@ export default function VenueProfilePage() {
 
       <Button className="w-full sm:w-auto" size="lg">حفظ الملعب</Button>
     </form>
+      <CourtSettings venue={venue} onSaved={refresh} />
+    </div>
   );
 }

@@ -12,7 +12,7 @@ import { HourSlot } from "@/components/hour-slot";
 import { useVenue } from "@/components/venue-provider";
 import { ButtonLink } from "@/components/ui";
 import { PageHeader } from "@/components/page-header";
-import { BookingBrief, CalendarResponse, DashboardData, ownerApi } from "@/lib/api";
+import { BookingBrief, CalendarResponse, DashboardData, Venue, ownerApi } from "@/lib/api";
 import { issueLabel, paymentLabel } from "@/lib/ar";
 import { formatMoney, formatTime, sourceLabel, todayYmd } from "@/lib/utils";
 
@@ -63,6 +63,7 @@ export default function HomePage() {
         title={isToday ? "اليوم" : date}
         action={
           <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/venue">إعداد الملعب</ButtonLink>
             <ButtonLink href="/calendar">
               <CalendarPlus size={16} />
               حجز جديد
@@ -70,6 +71,8 @@ export default function HomePage() {
           </div>
         }
       />
+
+      <SetupChecklist venue={venue} />
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
@@ -254,6 +257,42 @@ function BookingList({
             </Link>
           ))
         )}
+      </div>
+    </section>
+  );
+}
+
+function SetupChecklist({ venue }: { venue: Venue }) {
+  const items = [
+    { done: venue.latitude != null && venue.longitude != null, label: "تحديد موقع الملعب على الخريطة" },
+    { done: venue.photos.length > 0 || Boolean(venue.coverImageUrl), label: "رفع صور الملعب" },
+    { done: Boolean(venue.nameEn?.trim() && venue.addressEn?.trim()), label: "النصوص بالعربية والإنجليزية" },
+    {
+      done: venue.resources.some((resource) => resource.size && resource.surface && resource.setting),
+      label: "حجم الملعب (5 ضد 5 / 7 ضد 7 / 11 ضد 11) والمواصفات",
+    },
+  ];
+  const remaining = items.filter((item) => !item.done);
+  if (remaining.length === 0) return null;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-brand/40 bg-brand/10 shadow-sm">
+      <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-black text-slate-900">أكمل إعداد الملعب</h2>
+          <p className="mt-1 text-sm font-medium text-slate-600">
+            هذه البيانات تظهر للزبائن: الموقع، الصور، الحجم، العشب، الإنارة، وأسعار الأوقات العادية والذروة والعطلة.
+          </p>
+          <ul className="mt-3 space-y-1 text-sm font-semibold text-slate-700">
+            {items.map((item) => (
+              <li key={item.label} className={item.done ? "text-slate-400 line-through" : ""}>
+                {item.done ? "تم · " : "مطلوب · "}
+                {item.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <ButtonLink href="/venue">فتح إعداد الملعب</ButtonLink>
       </div>
     </section>
   );

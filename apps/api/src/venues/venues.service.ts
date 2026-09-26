@@ -70,6 +70,7 @@ export class VenuesService {
         latitude: input.latitude ?? undefined,
         longitude: input.longitude ?? undefined,
         coverImageUrl: input.coverImageUrl,
+        acceptsOnlineBooking: input.acceptsOnlineBooking ?? true,
         types: {
           create: input.venueTypeIds.map((venueTypeId) => ({ venueTypeId })),
         },
@@ -106,7 +107,8 @@ export class VenuesService {
           latitude: input.venue.latitude ?? undefined,
           longitude: input.venue.longitude ?? undefined,
           coverImageUrl: input.venue.coverImageUrl,
-          defaultDurationMinutes: input.resource.defaultDurationMinutes,
+          acceptsOnlineBooking: input.venue.acceptsOnlineBooking ?? true,
+          defaultDurationMinutes: input.resource?.defaultDurationMinutes ?? 60,
           types: {
             create: input.venue.venueTypeIds.map((venueTypeId) => ({ venueTypeId })),
           },
@@ -120,40 +122,42 @@ export class VenuesService {
         },
       });
 
-      await tx.venueResource.create({
-        data: {
-          venueId: created.id,
-          name: input.resource.name,
-          nameEn: input.resource.nameEn,
-          description: input.resource.description,
-          descriptionEn: input.resource.descriptionEn,
-          venueTypeId: input.resource.venueTypeId,
-          size: input.resource.size,
-          surface: input.resource.surface,
-          setting: input.resource.setting,
-          hasLights: input.resource.hasLights ?? false,
-          defaultDurationMinutes: input.resource.defaultDurationMinutes,
-          slotIntervalMinutes: input.resource.slotIntervalMinutes,
-          minDurationMinutes: input.resource.minDurationMinutes,
-          maxDurationMinutes: input.resource.maxDurationMinutes,
-          operatingHours: {
-            create: input.hours.map((hour) => ({
-              dayOfWeek: hour.dayOfWeek,
-              opensAt: hour.opensAt,
-              closesAt: hour.closesAt,
-              isClosed: hour.isClosed,
-            })),
+      if (input.venue.acceptsOnlineBooking && input.resource && input.hours) {
+        await tx.venueResource.create({
+          data: {
+            venueId: created.id,
+            name: input.resource.name,
+            nameEn: input.resource.nameEn,
+            description: input.resource.description,
+            descriptionEn: input.resource.descriptionEn,
+            venueTypeId: input.resource.venueTypeId,
+            size: input.resource.size,
+            surface: input.resource.surface,
+            setting: input.resource.setting,
+            hasLights: input.resource.hasLights ?? false,
+            defaultDurationMinutes: input.resource.defaultDurationMinutes,
+            slotIntervalMinutes: input.resource.slotIntervalMinutes,
+            minDurationMinutes: input.resource.minDurationMinutes,
+            maxDurationMinutes: input.resource.maxDurationMinutes,
+            operatingHours: {
+              create: input.hours.map((hour) => ({
+                dayOfWeek: hour.dayOfWeek,
+                opensAt: hour.opensAt,
+                closesAt: hour.closesAt,
+                isClosed: hour.isClosed,
+              })),
+            },
+            pricingRules: {
+              create: buildTierPricingRules({
+                regularPrice: input.defaultPrice ?? 0,
+                peakPrice: input.peakPrice,
+                peakStartsAt: input.peakStartsAt,
+                weekendPrice: input.weekendPrice,
+              }),
+            },
           },
-          pricingRules: {
-            create: buildTierPricingRules({
-              regularPrice: input.defaultPrice,
-              peakPrice: input.peakPrice,
-              peakStartsAt: input.peakStartsAt,
-              weekendPrice: input.weekendPrice,
-            }),
-          },
-        },
-      });
+        });
+      }
 
       return tx.venue.findUniqueOrThrow({
         where: { id: created.id },
@@ -167,23 +171,25 @@ export class VenuesService {
   async update(user: User, venueId: string, input: UpdateVenueInput) {
     await this.access.assertVenueRole(user, venueId, ["OWNER", "MANAGER"]);
     const venue = await this.prisma.$transaction(async (tx) => {
-      if (input.venueTypeIds) {
+      if (input.venueTypeIds !== undefined) {
         await tx.venueTypeAssignment.deleteMany({ where: { venueId } });
         await tx.venueTypeAssignment.createMany({
           data: input.venueTypeIds.map((venueTypeId) => ({ venueId, venueTypeId })),
         });
       }
-      if (input.amenityIds) {
+      if (input.amenityIds !== undefined) {
         await tx.venueAmenity.deleteMany({ where: { venueId } });
         await tx.venueAmenity.createMany({
           data: input.amenityIds.map((amenityId) => ({ venueId, amenityId })),
         });
       }
-      if (input.photoUrls) {
+      if (input.photoUrls !== undefined) {
         await tx.venuePhoto.deleteMany({ where: { venueId } });
-        await tx.venuePhoto.createMany({
-          data: input.photoUrls.map((url, sortOrder) => ({ venueId, url, sortOrder })),
-        });
+        if (input.photoUrls.length > 0) {
+          await tx.venuePhoto.createMany({
+            data: input.photoUrls.map((url, sortOrder) => ({ venueId, url, sortOrder })),
+          });
+        }
       }
       return tx.venue.update({
         where: { id: venueId },
@@ -201,6 +207,7 @@ export class VenuesService {
           longitude: input.longitude === undefined ? undefined : input.longitude,
           coverImageUrl: input.coverImageUrl,
           isActive: input.isActive,
+          acceptsOnlineBooking: input.acceptsOnlineBooking,
           slug: input.slug,
           defaultDurationMinutes: input.defaultDurationMinutes,
           minAdvanceHours: input.minAdvanceHours,
@@ -248,7 +255,8 @@ export class VenuesService {
       city: venue.city,
       latitude: venue.latitude ? Number(venue.latitude) : null,
       longitude: venue.longitude ? Number(venue.longitude) : null,
-      coverImageUrl: venue.coverImageUrl,
+      coverImageUrl: venue.coverImageUrl ?? venue.photos[0]?.url ?? null,
+      acceptsOnlineBooking: venue.acceptsOnlineBooking,
       timezone: venue.timezone,
       minAdvanceHours: venue.minAdvanceHours,
       maxAdvanceDays: venue.maxAdvanceDays,
@@ -257,7 +265,7 @@ export class VenuesService {
       startingPrice: resourcePrices.length ? Math.min(...resourcePrices) : null,
       types: venue.types.map((item) => item.venueType),
       amenities: venue.amenities.map((item) => item.amenity),
-      photos: venue.photos,
+      photos: venue.photos.map((photo) => ({ url: photo.url })),
       resources: venue.resources.map((resource) => {
         const prices = resource.pricingRules.map((rule) => money(rule.priceAmount));
         return {
@@ -393,6 +401,7 @@ export class VenuesService {
       longitude: { toString(): string } | null;
       coverImageUrl: string | null;
       isActive: boolean;
+      acceptsOnlineBooking: boolean;
       timezone: string;
       defaultDurationMinutes: number;
       minAdvanceHours: number;
@@ -422,6 +431,7 @@ export class VenuesService {
       longitude: venue.longitude ? Number(venue.longitude) : null,
       coverImageUrl: venue.coverImageUrl,
       isActive: venue.isActive,
+      acceptsOnlineBooking: venue.acceptsOnlineBooking,
       timezone: venue.timezone,
       defaultDurationMinutes: venue.defaultDurationMinutes,
       minAdvanceHours: venue.minAdvanceHours,

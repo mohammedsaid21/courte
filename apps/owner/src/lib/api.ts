@@ -31,6 +31,20 @@ async function token() {
   return data.session?.access_token;
 }
 
+async function publicApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, init);
+  if (!response.ok) {
+    let details: unknown = null;
+    try {
+      details = await response.json();
+    } catch {
+      details = await response.text();
+    }
+    throw new ApiError(extractErrorMessage(details, response.status), response.status, details);
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const accessToken = await token();
   const headers = new Headers(init.headers);
@@ -73,7 +87,7 @@ export const ownerApi = {
   amenities: () => api<CatalogItem[]>("/amenities"),
   venues: () => api<Venue[]>("/venues"),
   venue: (id: string) => api<Venue>(`/venues/${id}`),
-  publicVenue: (slug: string) => api<PublicVenue>(`/venues/public/${slug}`),
+  publicVenue: (slug: string) => publicApi<PublicVenue>(`/venues/public/${encodeURIComponent(slug)}`),
   onboard: (body: unknown) => api<Venue>("/venues/onboarding", { method: "POST", body: JSON.stringify(body) }),
   updateVenue: (id: string, body: unknown) =>
     api<Venue>(`/venues/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -176,6 +190,7 @@ export type Venue = {
   longitude: number | null;
   coverImageUrl: string | null;
   isActive: boolean;
+  acceptsOnlineBooking: boolean;
   timezone: string;
   defaultDurationMinutes: number;
   minAdvanceHours: number;

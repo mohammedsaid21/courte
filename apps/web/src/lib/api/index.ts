@@ -14,4 +14,5 @@ export type {
   AvailabilitySlot,
   AvailabilityResponse,
   CustomerBooking,
+  RecurringPlan,
 } from "./types";

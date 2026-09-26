@@ -13,6 +13,7 @@ type VenueContextValue = {
   venues: Me["venues"];
   loading: boolean;
   setVenueId: (id: string) => void;
+  replaceVenue: (venue: Venue) => void;
   refresh: () => Promise<void>;
 };
 
@@ -69,6 +70,12 @@ export function VenueProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function refreshVenue() {
+    const id = getStoredVenueId() ?? venue?.id;
+    if (!id) return;
+    setVenue(await ownerApi.venue(id));
+  }
+
   useEffect(() => {
     void load();
   }, []);
@@ -87,7 +94,8 @@ export function VenueProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         });
       },
-      refresh: load,
+      replaceVenue: (details) => setVenue(details),
+      refresh: refreshVenue,
     }),
     [me, venue, loading],
   );

@@ -1,36 +1,42 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, CircleDot, MapPin, Star, Timer, Trophy, X } from "lucide-react";
+import { CalendarCheck, Timer, Trophy } from "lucide-react";
 import { COURT_SIZES, HOME_CITIES } from "@/lib/ar";
-import { BOOKING_TIMES, FEATURED_COURTS, type FeaturedCourt } from "@/lib/featured-courts";
-import { OWNER_APP_URL, todayYmd } from "@/lib/utils";
+import { venueService, type DiscoverVenue } from "@/lib/api";
+import { addDaysYmd, OWNER_APP_URL, todayYmd } from "@/lib/utils";
+import { VenueCard } from "@/components/venue-card";
 
 export function HomeLanding() {
   const router = useRouter();
   const [city, setCity] = useState("");
+  const [area, setArea] = useState("");
   const [size, setSize] = useState("");
-  const [date, setDate] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [selected, setSelected] = useState<FeaturedCourt | null>(null);
+  const [availability, setAvailability] = useState<"any" | "today" | "week">("any");
+  const [filter, setFilter] = useState("");
+  const [venues, setVenues] = useState<DiscoverVenue[]>([]);
 
-  const courts = useMemo(() => {
-    return FEATURED_COURTS.filter((court) => {
-      const sizeOk = filter === "all" || court.size === filter;
-      const cityOk = !city || court.city === city;
-      const searchSizeOk = !size || court.size === size;
-      return sizeOk && cityOk && searchSizeOk;
-    });
-  }, [filter, city, size]);
+  useEffect(() => {
+    void venueService
+      .search({ pageSize: 6, size: (filter || size || undefined) as DiscoverVenue["sizes"][number] | undefined })
+      .then((result) => setVenues(result.items))
+      .catch(() => setVenues([]));
+  }, [filter, size]);
 
   function search(event: FormEvent) {
     event.preventDefault();
     const params = new URLSearchParams();
     const cityEn = HOME_CITIES.find((item) => item.ar === city)?.en;
     if (cityEn) params.set("city", cityEn);
+    if (area.trim()) params.set("area", area.trim());
     if (size) params.set("size", size);
-    if (date) params.set("date", date);
+    if (availability === "today") params.set("date", todayYmd());
+    if (availability === "week") {
+      params.set("date", todayYmd());
+      params.set("dateTo", addDaysYmd(todayYmd(), 6));
+    }
     router.push(`/venues${params.toString() ? `?${params}` : ""}`);
   }
 
@@ -63,7 +69,7 @@ export function HomeLanding() {
           </div>
           <form
             onSubmit={search}
-            className="glass reveal-3 mt-6 grid gap-2 rounded-[16px] p-2.5 sm:mt-8 sm:gap-3 sm:p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+            className="glass reveal-3 mt-6 grid gap-2 rounded-[16px] p-2.5 sm:mt-8 sm:gap-3 sm:p-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]"
           >
             <label className="block rounded-[12px] px-3 py-2">
               <span className="mb-1 block text-xs font-bold text-pitch">المدينة</span>
@@ -82,6 +88,16 @@ export function HomeLanding() {
               </select>
             </label>
             <label className="block rounded-[12px] px-3 py-2">
+              <span className="mb-1 block text-xs font-bold text-pitch">القرية / المنطقة</span>
+              <input
+                className="h-11 w-full bg-transparent text-sm font-bold outline-none"
+                value={area}
+                onChange={(event) => setArea(event.target.value)}
+                placeholder="اختياري"
+                aria-label="القرية أو المنطقة"
+              />
+            </label>
+            <label className="block rounded-[12px] px-3 py-2">
               <span className="mb-1 block text-xs font-bold text-pitch">حجم الملعب</span>
               <select
                 className="h-11 w-full bg-transparent text-sm font-bold outline-none"
@@ -98,15 +114,17 @@ export function HomeLanding() {
               </select>
             </label>
             <label className="block rounded-[12px] px-3 py-2">
-              <span className="mb-1 block text-xs font-bold text-pitch">التاريخ</span>
-              <input
-                type="date"
-                min={todayYmd()}
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
+              <span className="mb-1 block text-xs font-bold text-pitch">توفر الحجز</span>
+              <select
                 className="h-11 w-full bg-transparent text-sm font-bold outline-none"
-                aria-label="التاريخ"
-              />
+                value={availability}
+                onChange={(event) => setAvailability(event.target.value as "any" | "today" | "week")}
+                aria-label="توفر الحجز"
+              >
+                <option value="any">كل الملاعب</option>
+                <option value="today">متاح اليوم</option>
+                <option value="week">متاح هذا الأسبوع</option>
+              </select>
             </label>
             <button
               type="submit"
@@ -123,11 +141,11 @@ export function HomeLanding() {
           <div className="glass rounded-[12px] p-5 md:p-8">
             <h2 className="font-display text-2xl font-extrabold md:text-3xl">ملاعب مختارة لمباراتك القادمة</h2>
             <div className="mt-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="فلاتر حجم الملعب">
-              {[{ id: "all", label: "الكل" }, ...COURT_SIZES].map((item) => {
+              {[{ id: "", label: "الكل" }, ...COURT_SIZES].map((item) => {
                 const active = filter === item.id;
                 return (
                   <button
-                    key={item.id}
+                    key={item.id || "all"}
                     type="button"
                     role="tab"
                     aria-selected={active}
@@ -142,45 +160,15 @@ export function HomeLanding() {
               })}
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {courts.length === 0 ? (
-                <p className="text-sm font-medium text-text-muted sm:col-span-2 lg:col-span-3">لا يوجد ملعب بهذه الفلاتر. جرّب مدينة أو حجمًا آخر.</p>
+              {venues.length === 0 ? (
+                <p className="text-sm font-medium text-text-muted sm:col-span-2 lg:col-span-3">لا يوجد ملعب بهذه الفلاتر. جرّب حجمًا آخر أو تصفح كل الملاعب.</p>
               ) : (
-                courts.map((court) => (
-                  <article key={court.id} className="overflow-hidden rounded-[12px] border border-white/80 bg-white shadow-glass">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={court.image} alt={court.name} className="aspect-[16/10] w-full object-cover" />
-                    <div className="space-y-3 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-display text-xl font-extrabold">{court.name}</h3>
-                          <p className="mt-1 flex items-center gap-1 text-sm font-medium text-text-muted">
-                            <MapPin size={14} /> {court.city}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 font-bold text-gold">
-                          <Star size={16} fill="currentColor" />
-                          {court.rating}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-xs font-bold text-pitch">
-                        <span className="rounded-full bg-pitch-light px-3 py-1">{court.surface}</span>
-                        <span className="rounded-full bg-pitch-light px-3 py-1">{court.sizeLabel}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="font-display text-lg font-extrabold">{court.price} ₪<span className="text-sm font-bold text-text-muted">/ساعة</span></div>
-                        <button
-                          type="button"
-                          onClick={() => setSelected(court)}
-                          className="min-h-11 rounded-[12px] bg-pitch px-4 text-sm font-bold text-white hover:bg-pitch-dark"
-                        >
-                          عرض الأوقات
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))
+                venues.map((venue) => <VenueCard key={venue.id} venue={venue} />)
               )}
             </div>
+            <Link href="/venues" className="mt-6 inline-flex min-h-12 items-center font-bold text-pitch">
+              عرض كل الملاعب
+            </Link>
           </div>
         </div>
       </section>
@@ -228,126 +216,6 @@ export function HomeLanding() {
           </a>
         </div>
       </section>
-
-      <BookingModal court={selected} defaultDate={date} onClose={() => setSelected(null)} />
-    </div>
-  );
-}
-
-function BookingModal({
-  court,
-  defaultDate,
-  onClose,
-}: {
-  court: FeaturedCourt | null;
-  defaultDate: string;
-  onClose: () => void;
-}) {
-  const [time, setTime] = useState("");
-  const [bookDate, setBookDate] = useState(defaultDate || todayYmd());
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    setTime("");
-    setDone(false);
-    setBookDate(defaultDate || todayYmd());
-  }, [court, defaultDate]);
-
-  useEffect(() => {
-    if (!court) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [court, onClose]);
-
-  if (!court) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-pitch-deep/55 p-3 sm:items-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="booking-title"
-        className="glass w-full max-w-lg overflow-hidden rounded-[12px]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={court.image} alt={court.name} className="h-44 w-full object-cover" />
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute start-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/80"
-            aria-label="إغلاق"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-5">
-          {done ? (
-            <div className="py-8 text-center">
-              <CircleDot className="mx-auto text-pitch" size={36} />
-              <h2 id="booking-title" className="mt-4 font-display text-3xl font-extrabold">
-                تم تأكيد حجزك!
-              </h2>
-              <p className="mt-2 text-sm text-text-muted">
-                {court.name} · {bookDate} · {time}
-              </p>
-              <button type="button" onClick={onClose} className="mt-6 min-h-12 rounded-[12px] bg-pitch px-6 font-bold text-white">
-                إغلاق
-              </button>
-            </div>
-          ) : (
-            <>
-              <h2 id="booking-title" className="font-display text-2xl font-extrabold">
-                {court.name}
-              </h2>
-              <p className="mt-1 text-sm font-medium text-text-muted">
-                {court.city} · {court.sizeLabel} · {court.price} ₪/ساعة
-              </p>
-              <label className="mt-5 block">
-                <span className="mb-1 block text-xs font-bold text-pitch">التاريخ</span>
-                <input
-                  type="date"
-                  min={todayYmd()}
-                  value={bookDate}
-                  onChange={(event) => setBookDate(event.target.value)}
-                  className="h-12 w-full rounded-[12px] border border-border bg-white px-3 text-sm font-bold"
-                />
-              </label>
-              <p className="mt-4 text-xs font-bold text-pitch">الوقت</p>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {BOOKING_TIMES.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setTime(item)}
-                    className={`min-h-12 rounded-[12px] text-sm font-bold ${
-                      time === item ? "bg-pitch text-white" : "bg-pitch-light text-pitch"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                disabled={!time || !bookDate}
-                onClick={() => setDone(true)}
-                className="mt-5 min-h-14 w-full rounded-[12px] bg-pitch font-bold text-white disabled:opacity-50"
-              >
-                تأكيد الحجز
-              </button>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

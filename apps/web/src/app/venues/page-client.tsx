@@ -1,6 +1,5 @@
 "use client";
 
-import { WEST_BANK_CITIES } from "@courte/shared";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert } from "@/components/ui";
@@ -11,7 +10,6 @@ import { Button } from "@/components/ui";
 import { VenueCard } from "@/components/venue-card";
 import { userFacingMessage, venueService, type CatalogItem, type DiscoverVenue } from "@/lib/api";
 import { todayYmd } from "@/lib/utils";
-import { cityAr } from "@/lib/ar";
 
 const PAGE_SIZE = 12;
 
@@ -31,8 +29,10 @@ export default function VenuesPage() {
     () => ({
       q: params.get("q") ?? undefined,
       city: params.get("city") ?? undefined,
+      area: params.get("area") ?? undefined,
       typeId: params.get("typeId") ?? undefined,
       date: params.get("date") ?? undefined,
+      dateTo: params.get("dateTo") ?? undefined,
       time: params.get("time") ?? undefined,
       size: (params.get("size") as DiscoverVenue["sizes"][number] | null) ?? undefined,
       minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : undefined,
@@ -108,13 +108,12 @@ export default function VenuesPage() {
   }
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const city = query.city ?? "";
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 md:px-6">
       <div className="max-w-2xl">
         <h1 className="text-h1">ابحث عن ملعب</h1>
-        <p className="mt-2 text-body">ملاعب كرة قدم في الضفة. اختر المدينة والوقت واحجز.</p>
+        <p className="mt-2 text-body">فلتر حسب المدينة والمنطقة والحجم والأوقات المتاحة ثم احجز.</p>
       </div>
       <SearchPanel initial={query} compact />
       <SportFilter types={types} value={query.typeId} onChange={setType} />
@@ -122,23 +121,6 @@ export default function VenuesPage() {
         <Button type="button" variant="outline" size="sm" onClick={useLocation}>
           قربي
         </Button>
-        <select
-          className="h-10 rounded-[12px] border border-border bg-white px-4 text-sm font-bold"
-          value={city}
-          onChange={(event) => {
-            const next = new URLSearchParams(params.toString());
-            if (event.target.value) next.set("city", event.target.value);
-            else next.delete("city");
-            router.push(`/venues?${next.toString()}`);
-          }}
-        >
-          <option value="">كل المدن</option>
-          {WEST_BANK_CITIES.map((item) => (
-            <option key={item} value={item}>
-              {cityAr(item)}
-            </option>
-          ))}
-        </select>
         {locationMessage && <p className="text-sm text-text-muted">{locationMessage}</p>}
       </div>
       {error && <Alert tone="danger" description={error} />}
@@ -152,9 +134,11 @@ export default function VenuesPage() {
         <EmptyState
           title="لا يوجد ملعب بهذه الفلاتر"
           body={
-            query.date
+            query.dateTo
+              ? "لا توجد أوقات شاغرة خلال هذه الفترة. جرّب مدينة أو حجمًا آخر."
+              : query.date
               ? "لا توجد أوقات في هذا اليوم. جرّب يومًا أو مدينة أخرى."
-              : "جرّب مدينة أو نوعًا مختلفًا."
+              : "جرّب مدينة أو حجمًا أو منطقة مختلفة."
           }
         />
       ) : (
@@ -182,9 +166,10 @@ export default function VenuesPage() {
           )}
         </>
       )}
-      {!query.date && (
+      {(query.date || query.dateTo) && (
         <p className="text-sm text-text-muted">
-          أضف تاريخًا لعرض الملاعب التي فيها وقت شاغر ذلك اليوم. اليوم {todayYmd()}.
+          تظهر الملاعب التي فيها وقت شاغر
+          {query.dateTo ? " خلال هذا الأسبوع." : query.date === todayYmd() ? " اليوم." : " في التاريخ المحدد."}
         </p>
       )}
     </div>

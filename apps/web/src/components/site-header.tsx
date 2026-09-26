@@ -10,7 +10,7 @@ import { Wordmark } from "@/components/wordmark";
 import { cn, OWNER_APP_URL } from "@/lib/utils";
 
 const links = [
-  { href: "/#venues", label: "الملاعب" },
+  { href: "/venues", label: "الملاعب" },
   { href: "/#how", label: "طريقة الحجز" },
   { href: "/#owners", label: "لأصحاب الملاعب" },
 ];
@@ -94,7 +94,7 @@ export function SiteHeader() {
             </Link>
           )}
           <Link
-            href="/#venues"
+            href="/venues"
             className={cn(
               "inline-flex min-h-11 items-center rounded-[12px] px-4 text-sm font-bold",
               home ? "bg-gold text-pitch-deep hover:bg-gold-soft" : "bg-pitch text-white hover:bg-pitch-dark",
@@ -142,7 +142,7 @@ export function SiteHeader() {
               </a>
             </nav>
             <Link
-              href="/#venues"
+              href="/venues"
               onClick={() => setOpen(false)}
               className="mt-8 inline-flex min-h-14 w-full items-center justify-center rounded-[12px] bg-pitch text-base font-bold text-white"
             >

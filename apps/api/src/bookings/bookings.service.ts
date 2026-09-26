@@ -11,6 +11,7 @@ import {
   BookingsQuery,
   CreateBookingInput,
   CreateCustomerBookingInput,
+  CreateCustomerBookingsBatchInput,
   UpdateBookingInput,
 } from "@courte/shared";
 import { AccessService } from "../access/access.service";
@@ -386,6 +387,13 @@ export class BookingsService {
     if (!user.fullName || !user.phone) {
       throw new BadRequestException("Add your name and phone number to your profile before booking.");
     }
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: input.venueId },
+      select: { acceptsOnlineBooking: true, isActive: true },
+    });
+    if (!venue?.isActive || !venue.acceptsOnlineBooking) {
+      throw new BadRequestException("Online booking is not available for this venue.");
+    }
     const created = await this.create(
       user,
       {
@@ -407,6 +415,14 @@ export class BookingsService {
       { asCustomer: true },
     );
     return this.getMine(user, created.id as string);
+  }
+
+  async createManyAsCustomer(user: User, input: CreateCustomerBookingsBatchInput) {
+    const created: Awaited<ReturnType<typeof this.createAsCustomer>>[] = [];
+    for (const booking of input.bookings) {
+      created.push(await this.createAsCustomer(user, booking));
+    }
+    return created;
   }
 
   async listMine(user: User) {

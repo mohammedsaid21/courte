@@ -156,6 +156,7 @@ model Venue {
   longitude                  Decimal? @db.Decimal(10, 7)
   coverImageUrl              String?  @map("cover_image_url")
   isActive                   Boolean  @default(true) @map("is_active")
+  acceptsOnlineBooking       Boolean  @default(true) @map("accepts_online_booking")
   timezone                   String   @default("Asia/Hebron")
   defaultDurationMinutes     Int      @default(60) @map("default_duration_minutes")
   minAdvanceHours            Int      @default(0) @map("min_advance_hours")

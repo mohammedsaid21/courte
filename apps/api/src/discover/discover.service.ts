@@ -22,10 +22,20 @@ export class DiscoverService {
     const pageSize = query.pageSize ?? 20;
     const search = query.q?.trim();
 
+    const area = query.area?.trim();
     const venues = await this.prisma.venue.findMany({
       where: {
         isActive: true,
         city: query.city || undefined,
+        ...(area
+          ? {
+              OR: [
+                { address: { contains: area, mode: "insensitive" } },
+                { addressEn: { contains: area, mode: "insensitive" } },
+                { city: { contains: area, mode: "insensitive" } },
+              ],
+            }
+          : {}),
         ...(search
           ? {
               OR: [
@@ -71,10 +81,12 @@ export class DiscoverService {
         ? { latitude: query.lat, longitude: query.lng }
         : null;
 
-    const bookingsByVenue = query.date
+    const availabilityDates = this.availabilityDates(query.date, query.dateTo);
+    const bookingsByVenue = availabilityDates.length
       ? await this.loadBookingsByVenue(
           venues.map((venue) => venue.id),
-          query.date,
+          availabilityDates[0],
+          availabilityDates[availabilityDates.length - 1],
         )
       : new Map<string, AvailabilityBooking[]>();
 
@@ -91,8 +103,10 @@ export class DiscoverService {
       const startingPrice = prices.length > 0 ? Math.min(...prices) : null;
       const hoursStatus = this.hoursStatus(venue);
       const available =
-        query.date || query.time
-          ? this.hasAvailability(venue, bookingsByVenue.get(venue.id) ?? [], query.date, query.time)
+        availabilityDates.length > 0
+          ? availabilityDates.some((date) =>
+              this.hasAvailability(venue, bookingsByVenue.get(venue.id) ?? [], date, query.time),
+            )
           : true;
 
       return {
@@ -104,6 +118,7 @@ export class DiscoverService {
         address: venue.address,
         addressEn: venue.addressEn,
         coverImageUrl: venue.coverImageUrl ?? venue.photos[0]?.url ?? null,
+        acceptsOnlineBooking: venue.acceptsOnlineBooking,
         types: venue.types.map((item) => item.venueType),
         sizes: [...new Set(venue.resources.map((resource) => courtSizeSlug(resource.size)).filter((item): item is NonNullable<typeof item> => item != null))],
         surfaces: [...new Set(venue.resources.map((resource) => resource.surface).filter((item): item is NonNullable<typeof item> => item != null))],
@@ -195,12 +210,26 @@ export class DiscoverService {
     return { open: false, label: "Closed" };
   }
 
-  private async loadBookingsByVenue(venueIds: string[], date: string) {
+  private availabilityDates(from?: string, to?: string) {
+    if (!from) return [];
+    const end = to && to >= from ? to : from;
+    const dates: string[] = [];
+    let current = from;
+    while (current <= end && dates.length < 7) {
+      dates.push(current);
+      const next = new Date(`${current}T12:00:00.000Z`);
+      next.setUTCDate(next.getUTCDate() + 1);
+      current = next.toISOString().slice(0, 10);
+    }
+    return dates;
+  }
+
+  private async loadBookingsByVenue(venueIds: string[], from: string, to = from) {
     const bookingsByVenue = new Map<string, AvailabilityBooking[]>();
     if (venueIds.length === 0) return bookingsByVenue;
 
-    const rangeStart = new Date(`${date}T00:00:00.000Z`);
-    const rangeEnd = new Date(`${date}T23:59:59.999Z`);
+    const rangeStart = new Date(`${from}T00:00:00.000Z`);
+    const rangeEnd = new Date(`${to}T23:59:59.999Z`);
     const bookings = await this.prisma.booking.findMany({
       where: {
         venueId: { in: venueIds },
@@ -254,6 +283,7 @@ export class DiscoverService {
     time?: string,
   ) {
     if (!date) return true;
+    if (venue.resources.length === 0) return true;
 
     for (const resource of venue.resources) {
       const window = windowForDate({

@@ -41,6 +41,16 @@ export function addDaysYmd(date: string, days: number) {
   return format(addDays(new Date(`${date}T12:00:00`), days), "yyyy-MM-dd");
 }
 
+export function addMonthsYmd(date: string, months: number) {
+  const value = new Date(`${date}T12:00:00`);
+  value.setMonth(value.getMonth() + months);
+  return format(value, "yyyy-MM-dd");
+}
+
+export function weekdayFromYmd(date: string) {
+  return new Date(`${date}T12:00:00`).getDay();
+}
+
 export function weekdayLabel(day: number) {
   return ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][day];
 }
@@ -60,6 +70,13 @@ export function durationOptions(min: number, max: number, interval: number) {
   }
   if (values[values.length - 1] !== max) values.push(max);
   return values;
+}
+
+export function venueCoverUrl(input: {
+  coverImageUrl: string | null;
+  photos?: { url: string }[];
+}) {
+  return input.coverImageUrl ?? input.photos?.[0]?.url ?? null;
 }
 
 export function mapsUrl(input: {

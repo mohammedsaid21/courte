@@ -9,6 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const TIMEZONE = "Asia/Hebron";
+export const CUSTOMER_SITE_URL = process.env.NEXT_PUBLIC_CUSTOMER_URL ?? "http://localhost:3002";
 
 export function formatMoney(amount: number, _currency = "ILS") {
   const value = amount.toFixed(amount % 1 === 0 ? 0 : 2);

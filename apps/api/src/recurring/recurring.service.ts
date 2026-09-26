@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { User } from "@prisma/client";
-import { CreateRecurringSeriesInput } from "@courte/shared";
+import { CreateCustomerRecurringInput, CreateRecurringSeriesInput } from "@courte/shared";
 import { AccessService } from "../access/access.service";
 import { evaluateAvailability, generateRecurringOccurrences } from "../booking-engine";
 import { money } from "../common/util";
@@ -21,6 +21,11 @@ export class RecurringService {
 
   async preview(user: User, input: CreateRecurringSeriesInput) {
     const plan = await this.plan(user, input);
+    return this.serializePlan(plan);
+  }
+
+  async previewAsCustomer(user: User, input: CreateCustomerRecurringInput) {
+    const plan = await this.plan(user, this.customerInput(user, input), { asCustomer: true });
     return this.serializePlan(plan);
   }
 
@@ -86,6 +91,70 @@ export class RecurringService {
     });
 
     return this.get(user, series.id);
+  }
+
+  async createAsCustomer(user: User, input: CreateCustomerRecurringInput) {
+    if (!user.fullName || !user.phone) {
+      throw new BadRequestException("Add your name and phone number to your profile before booking.");
+    }
+    const body = this.customerInput(user, input);
+    const plan = await this.plan(user, body, { asCustomer: true });
+    if (plan.conflicts.length > 0 && !input.skipConflicts) {
+      throw new ConflictException({
+        message: `${plan.conflicts.length} date(s) already have a booking or block. Skip those dates or change the series.`,
+        ...this.serializePlan(plan),
+      });
+    }
+    if (plan.create.length === 0) {
+      throw new BadRequestException("No dates left to create after conflicts.");
+    }
+
+    const series = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.recurringSeries.create({
+        data: {
+          venueId: input.venueId,
+          resourceId: input.resourceId,
+          customerId: plan.customer.id,
+          createdByUserId: user.id,
+          daysOfWeek: [...new Set(input.daysOfWeek)],
+          startTime: input.startTime,
+          durationMinutes: input.durationMinutes,
+          priceAmount: plan.priceAmount,
+          startDate: new Date(`${input.startDate}T00:00:00.000Z`),
+          endDate: new Date(`${input.endDate}T00:00:00.000Z`),
+          source: "CUSTOMER",
+          paymentStatus: "UNPAID",
+          notes: input.notes,
+        },
+      });
+
+      for (const item of plan.create) {
+        await tx.booking.create({
+          data: {
+            venueId: input.venueId,
+            resourceId: input.resourceId,
+            customerId: plan.customer.id,
+            createdByUserId: user.id,
+            updatedByUserId: user.id,
+            recurringSeriesId: created.id,
+            source: "CUSTOMER",
+            status: "CONFIRMED",
+            paymentStatus: "UNPAID",
+            startsAt: item.start,
+            endsAt: item.end,
+            priceAmount: plan.priceAmount,
+            paidAmount: 0,
+            notes: input.notes,
+          },
+        });
+      }
+      return created;
+    });
+
+    return {
+      id: series.id,
+      ...this.serializePlan(plan),
+    };
   }
 
   async list(user: User, venueId: string) {
@@ -177,8 +246,32 @@ export class RecurringService {
     return this.get(user, seriesId);
   }
 
-  private async plan(user: User, input: CreateRecurringSeriesInput) {
-    const { venue } = await this.access.assertVenueRole(user, input.venueId);
+  private customerInput(user: User, input: CreateCustomerRecurringInput): CreateRecurringSeriesInput {
+    return {
+      venueId: input.venueId,
+      resourceId: input.resourceId,
+      daysOfWeek: input.daysOfWeek,
+      startTime: input.startTime,
+      durationMinutes: input.durationMinutes,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      notes: input.notes,
+      skipConflicts: input.skipConflicts ?? true,
+      source: "CUSTOMER",
+      paymentStatus: "UNPAID",
+      customer: {
+        name: user.fullName ?? "",
+        phone: user.phone ?? "",
+        whatsapp: user.whatsapp,
+      },
+    };
+  }
+
+  private async plan(user: User, input: CreateRecurringSeriesInput, options?: { asCustomer?: boolean }) {
+    const venue = options?.asCustomer
+      ? await this.prisma.venue.findFirst({ where: { id: input.venueId, isActive: true } })
+      : (await this.access.assertVenueRole(user, input.venueId)).venue;
+    if (!venue) throw new NotFoundException("Venue not found");
     const resource = await this.prisma.venueResource.findFirst({
       where: { id: input.resourceId, venueId: input.venueId },
       include: { operatingHours: true, exceptions: true, pricingRules: true },

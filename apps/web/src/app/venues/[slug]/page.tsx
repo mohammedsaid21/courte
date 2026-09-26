@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { VenueProfile } from "@/components/venue-profile";
 import { venueService } from "@/lib/api";
-import { SITE_NAME, SITE_URL } from "@/lib/utils";
+import { SITE_NAME, SITE_URL, venueCoverUrl } from "@/lib/utils";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 type Params = { slug: string };
 
@@ -36,7 +36,10 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       description,
       url,
       type: "website",
-      images: venue.coverImageUrl ? [{ url: venue.coverImageUrl }] : undefined,
+      images: (() => {
+        const image = venueCoverUrl(venue);
+        return image ? [{ url: image }] : undefined;
+      })(),
     },
   };
 }

@@ -18,8 +18,10 @@ export type Me = {
 export type DiscoverQuery = {
   q?: string;
   city?: string;
+  area?: string;
   typeId?: string;
   date?: string;
+  dateTo?: string;
   time?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -52,6 +54,7 @@ export type DiscoverVenue = {
   latitude: number | null;
   longitude: number | null;
   available: boolean;
+  acceptsOnlineBooking: boolean;
 };
 
 export type DiscoverResponse = {
@@ -104,6 +107,7 @@ export type PublicVenue = {
   latitude: number | null;
   longitude: number | null;
   coverImageUrl: string | null;
+  acceptsOnlineBooking: boolean;
   timezone: string;
   minAdvanceHours: number;
   maxAdvanceDays: number;
@@ -165,4 +169,13 @@ export type CustomerBooking = {
     cancellationPolicy: string | null;
     timezone: string;
   };
+};
+
+export type RecurringPlan = {
+  createCount: number;
+  conflictCount: number;
+  priceAmount: number;
+  resourceName: string;
+  create: { date: string; startsAt: string; endsAt: string }[];
+  conflicts: { date: string; startsAt: string; endsAt: string; reason: string }[];
 };

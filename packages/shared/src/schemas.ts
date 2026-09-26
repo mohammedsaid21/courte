@@ -38,6 +38,7 @@ export const createVenueSchema = z.object({
   venueTypeIds: z.array(z.string().uuid()).min(1),
   amenityIds: z.array(z.string().uuid()).default([]),
   photoUrls: z.array(z.string().url()).max(12).default([]),
+  acceptsOnlineBooking: z.boolean().default(true),
 });
 
 export const bookingRulesSchema = z.object({
@@ -48,10 +49,17 @@ export const bookingRulesSchema = z.object({
   cancellationPolicy: z.string().trim().max(2000).optional().nullable(),
 });
 
-export const updateVenueSchema = createVenueSchema.partial().extend({
-  isActive: z.boolean().optional(),
-  slug: z.string().trim().min(2).max(80).optional(),
-}).merge(bookingRulesSchema.partial());
+export const updateVenueSchema = createVenueSchema
+  .partial()
+  .extend({
+    isActive: z.boolean().optional(),
+    acceptsOnlineBooking: z.boolean().optional(),
+    slug: z.string().trim().min(2).max(80).optional(),
+    venueTypeIds: z.array(z.string().uuid()).min(1).optional(),
+    amenityIds: z.array(z.string().uuid()).optional(),
+    photoUrls: z.array(z.string().url()).max(12).optional(),
+  })
+  .merge(bookingRulesSchema.partial());
 
 export const updateProfileSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -202,6 +210,32 @@ export const createCustomerBookingSchema = z.object({
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 
+export const createCustomerBookingsBatchSchema = z.object({
+  bookings: z.array(createCustomerBookingSchema).min(1).max(12),
+});
+
+export const createCustomerRecurringSchema = z
+  .object({
+    venueId: z.string().uuid(),
+    resourceId: z.string().uuid(),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    startTime: hhmm,
+    durationMinutes: z.number().int().min(15).max(720),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    notes: z.string().trim().max(2000).optional().nullable(),
+    skipConflicts: z.boolean().default(true),
+  })
+  .superRefine((value, ctx) => {
+    if (value.endDate < value.startDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End date must be on or after start date",
+        path: ["endDate"],
+      });
+    }
+  });
+
 export const publicAvailabilityQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   durationMinutes: z.coerce.number().int().min(15).max(720).optional(),
@@ -210,8 +244,10 @@ export const publicAvailabilityQuerySchema = z.object({
 export const discoverQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().max(80).optional(),
   city: z.string().trim().max(80).optional(),
+  area: z.string().trim().max(80).optional(),
   typeId: z.string().uuid().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   time: hhmm.optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
@@ -224,15 +260,40 @@ export const discoverQuerySchema = paginationQuerySchema.extend({
 
 export const citySchema = z.enum(WEST_BANK_CITIES);
 
-export const onboardingSchema = z.object({
-  venue: createVenueSchema,
-  resource: createResourceSchema,
-  hours: z.array(operatingHourSchema).length(7),
-  defaultPrice: z.number().nonnegative(),
-  peakPrice: z.number().nonnegative().optional(),
-  peakStartsAt: hhmm.optional(),
-  weekendPrice: z.number().nonnegative().optional(),
-});
+export const onboardingSchema = z
+  .object({
+    venue: createVenueSchema,
+    resource: createResourceSchema.optional(),
+    hours: z.array(operatingHourSchema).length(7).optional(),
+    defaultPrice: z.number().nonnegative().optional(),
+    peakPrice: z.number().nonnegative().optional(),
+    peakStartsAt: hhmm.optional(),
+    weekendPrice: z.number().nonnegative().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.venue.acceptsOnlineBooking) return;
+    if (!value.resource) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Court details are required when online booking is enabled",
+        path: ["resource"],
+      });
+    }
+    if (!value.hours?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Operating hours are required when online booking is enabled",
+        path: ["hours"],
+      });
+    }
+    if (value.defaultPrice === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Default price is required when online booking is enabled",
+        path: ["defaultPrice"],
+      });
+    }
+  });
 
 export const createRecurringSeriesSchema = z
   .object({
@@ -288,6 +349,8 @@ export type BookingsQuery = z.infer<typeof bookingsQuerySchema>;
 export type BookingRulesInput = z.infer<typeof bookingRulesSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type CreateCustomerBookingInput = z.infer<typeof createCustomerBookingSchema>;
+export type CreateCustomerBookingsBatchInput = z.infer<typeof createCustomerBookingsBatchSchema>;
+export type CreateCustomerRecurringInput = z.infer<typeof createCustomerRecurringSchema>;
 export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 export type PublicAvailabilityQuery = z.infer<typeof publicAvailabilityQuerySchema>;
 export type CreateRecurringSeriesInput = z.infer<typeof createRecurringSeriesSchema>;

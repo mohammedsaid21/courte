@@ -19,7 +19,7 @@ function rawMessage(details: unknown, status: number) {
 
 export function userFacingMessage(error: unknown) {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "Please sign in to continue.";
+    if (error.status === 401) return "سجّل الدخول للمتابعة.";
     if (error.status === 404) {
       if (/venue/i.test(error.message)) return "This venue could not be found.";
       if (/resource/i.test(error.message)) return "This court or field is not available.";
