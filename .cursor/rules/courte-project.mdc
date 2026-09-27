@@ -1,0 +1,28 @@
+---
+description: Courte monorepo map — read before any change
+alwaysApply: true
+---
+
+# Courte project context
+
+**Before planning or editing**, read `docs/COURTE-PROJECT.md` in full and follow it.
+
+## Stack (4 packages)
+
+- **Backend**: `apps/api` — NestJS, Prisma, `/api` on port 3001
+- **Owner frontend**: `apps/owner` — Next.js, port 3000 (venue owners)
+- **Player frontend**: `apps/web` — Next.js, port 3002 (discovery + booking)
+- **Shared**: `packages/shared` — Zod schemas & domain helpers (`@courte/shared`)
+
+There is **one API** and **two Next apps**. Feature work often touches **shared + api + one or both frontends**.
+
+## Workflow for user requests
+
+1. Open and read `docs/COURTE-PROJECT.md`.
+2. Decide which layers change (shared → api → owner/web).
+3. Keep API and UI aligned via shared schemas, not duplicated types.
+4. Respect account split: `OWNER` = owner app only, `CUSTOMER` = web app only (`access.service.ts`, portal-access on each app).
+5. Match existing patterns in the target app; minimal diff.
+6. Run `pnpm run typecheck` when TypeScript/shared/API/UI changed.
+
+If the request is ambiguous about which app, infer from audience (owner vs player) using the doc table.

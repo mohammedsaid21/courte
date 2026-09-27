@@ -67,7 +67,8 @@ export const updateProfileSchema = z.object({
   whatsapp: z.string().trim().min(6).max(30).optional().nullable(),
 });
 
-export const createResourceSchema = z.object({
+
+const createResourceBaseSchema = z.object({
   name: z.string().trim().min(2).max(120),
   nameEn: z.string().trim().min(2).max(120).optional().nullable(),
   description: z.string().trim().max(2000).optional().nullable(),
@@ -82,9 +83,25 @@ export const createResourceSchema = z.object({
   minDurationMinutes: z.number().int().min(15).max(480),
   maxDurationMinutes: z.number().int().min(15).max(720),
   sortOrder: z.number().int().min(0).optional(),
+  regularPrice: z.number().nonnegative().optional(),
+  peakPrice: z.number().nonnegative().optional().nullable(),
+  peakStartsAt: hhmm.optional(),
+  weekendPrice: z.number().nonnegative().optional().nullable(),
 });
 
-export const updateResourceSchema = createResourceSchema.partial().extend({
+export const createResourceSchema = createResourceBaseSchema.superRefine((value, ctx) => {
+  const hasPeak = value.peakPrice != null;
+  const hasWeekend = value.weekendPrice != null;
+  if ((hasPeak || hasWeekend) && value.regularPrice === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Regular price is required when setting peak or weekend prices",
+      path: ["regularPrice"],
+    });
+  }
+});
+
+export const updateResourceSchema = createResourceBaseSchema.partial().extend({
   isActive: z.boolean().optional(),
 });
 
@@ -212,6 +229,10 @@ export const createCustomerBookingSchema = z.object({
 
 export const createCustomerBookingsBatchSchema = z.object({
   bookings: z.array(createCustomerBookingSchema).min(1).max(12),
+});
+
+export const cancelCustomerBookingsBatchSchema = z.object({
+  bookingIds: z.array(z.string().uuid()).min(1).max(24),
 });
 
 export const createCustomerRecurringSchema = z
@@ -350,6 +371,7 @@ export type BookingRulesInput = z.infer<typeof bookingRulesSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type CreateCustomerBookingInput = z.infer<typeof createCustomerBookingSchema>;
 export type CreateCustomerBookingsBatchInput = z.infer<typeof createCustomerBookingsBatchSchema>;
+export type CancelCustomerBookingsBatchInput = z.infer<typeof cancelCustomerBookingsBatchSchema>;
 export type CreateCustomerRecurringInput = z.infer<typeof createCustomerRecurringSchema>;
 export type DiscoverQuery = z.infer<typeof discoverQuerySchema>;
 export type PublicAvailabilityQuery = z.infer<typeof publicAvailabilityQuerySchema>;

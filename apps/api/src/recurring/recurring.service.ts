@@ -25,6 +25,7 @@ export class RecurringService {
   }
 
   async previewAsCustomer(user: User, input: CreateCustomerRecurringInput) {
+    this.access.assertPlayerAccount(user);
     const plan = await this.plan(user, this.customerInput(user, input), { asCustomer: true });
     return this.serializePlan(plan);
   }
@@ -64,6 +65,8 @@ export class RecurringService {
       });
 
       for (const item of plan.create) {
+        const bookingPaid = input.paymentStatus === "PAID" ? item.priceAmount : 0;
+        const bookingPaymentStatus = derivePaymentStatus(item.priceAmount, bookingPaid);
         await tx.booking.create({
           data: {
             venueId: input.venueId,
@@ -74,15 +77,15 @@ export class RecurringService {
             recurringSeriesId: created.id,
             source: input.source,
             status: "CONFIRMED",
-            paymentStatus,
+            paymentStatus: bookingPaymentStatus,
             startsAt: item.start,
             endsAt: item.end,
-            priceAmount: plan.priceAmount,
-            paidAmount,
+            priceAmount: item.priceAmount,
+            paidAmount: bookingPaid,
             notes: input.notes,
             payments:
-              paidAmount > 0
-                ? { create: { amount: paidAmount, method: "CASH" } }
+              bookingPaid > 0
+                ? { create: { amount: bookingPaid, method: "CASH" } }
                 : undefined,
           },
         });
@@ -94,6 +97,7 @@ export class RecurringService {
   }
 
   async createAsCustomer(user: User, input: CreateCustomerRecurringInput) {
+    this.access.assertPlayerAccount(user);
     if (!user.fullName || !user.phone) {
       throw new BadRequestException("Add your name and phone number to your profile before booking.");
     }
@@ -142,7 +146,7 @@ export class RecurringService {
             paymentStatus: "UNPAID",
             startsAt: item.start,
             endsAt: item.end,
-            priceAmount: plan.priceAmount,
+            priceAmount: item.priceAmount,
             paidAmount: 0,
             notes: input.notes,
           },
@@ -303,32 +307,17 @@ export class RecurringService {
     });
 
     const customer = await this.resolveCustomer(input);
-    const first = occurrences[0];
-    const quote = evaluateAvailability({
-      start: first.start,
-      end: first.end,
-      timeZone: venue.timezone,
-      resourceActive: resource.isActive,
-      minDurationMinutes: resource.minDurationMinutes,
-      maxDurationMinutes: resource.maxDurationMinutes,
-      hours: resource.operatingHours,
-      exceptions: resource.exceptions,
-      overlappingBookings: [],
-      rules: resource.pricingRules.map((rule) => ({
-        name: rule.name,
-        dayOfWeek: rule.dayOfWeek,
-        startsAt: rule.startsAt,
-        endsAt: rule.endsAt,
-        priceAmount: money(rule.priceAmount),
-        isDefault: rule.isDefault,
-        sortOrder: rule.sortOrder,
-      })),
-      allowOutsideHours: true,
-      enforceAdvanceWindow: false,
-    });
-    const priceAmount = input.priceAmount ?? quote.priceAmount ?? 0;
+    const pricingRules = resource.pricingRules.map((rule) => ({
+      name: rule.name,
+      dayOfWeek: rule.dayOfWeek,
+      startsAt: rule.startsAt,
+      endsAt: rule.endsAt,
+      priceAmount: money(rule.priceAmount),
+      isDefault: rule.isDefault,
+      sortOrder: rule.sortOrder,
+    }));
 
-    const create: typeof occurrences = [];
+    const create: (ReturnType<typeof generateRecurringOccurrences>[number] & { priceAmount: number })[] = [];
     const conflicts: {
       date: string;
       startsAt: Date;
@@ -368,8 +357,25 @@ export class RecurringService {
         });
         continue;
       }
-      create.push(item);
+      const quote = evaluateAvailability({
+        start: item.start,
+        end: item.end,
+        timeZone: venue.timezone,
+        resourceActive: resource.isActive,
+        minDurationMinutes: resource.minDurationMinutes,
+        maxDurationMinutes: resource.maxDurationMinutes,
+        hours: resource.operatingHours,
+        exceptions: resource.exceptions,
+        overlappingBookings: [],
+        rules: pricingRules,
+        allowOutsideHours: true,
+        enforceAdvanceWindow: false,
+      });
+      const priceAmount = input.priceAmount ?? quote.priceAmount ?? 0;
+      create.push({ ...item, priceAmount });
     }
+
+    const priceAmount = create.reduce((sum, item) => sum + item.priceAmount, 0);
 
     return { create, conflicts, customer, priceAmount, resourceName: resource.name };
   }

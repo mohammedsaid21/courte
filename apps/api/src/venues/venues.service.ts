@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { User } from "@prisma/client";
 import {
   CreateResourceInput,
@@ -31,6 +31,7 @@ export class VenuesService {
   ) {}
 
   async listForUser(user: User) {
+    this.access.assertOwnerAccount(user);
     const memberships = await this.prisma.venueMember.findMany({
       where: { userId: user.id },
       include: { venue: { include: venueInclude } },
@@ -305,11 +306,14 @@ export class VenuesService {
       this.prisma.venueResource.count({ where: { venueId } }),
       this.prisma.venueResource.findFirst({
         where: { venueId },
-        include: { operatingHours: true, pricingRules: true },
+        include: { operatingHours: true },
         orderBy: { sortOrder: "asc" },
       }),
       this.prisma.venue.findUniqueOrThrow({ where: { id: venueId } }),
     ]);
+    if (venue.acceptsOnlineBooking && input.regularPrice === undefined) {
+      throw new BadRequestException("Each court needs its own price. Set regularPrice for this court.");
+    }
     const hours =
       template?.operatingHours.map((hour) => ({
         dayOfWeek: hour.dayOfWeek,
@@ -323,6 +327,15 @@ export class VenuesService {
         closesAt: "23:00",
         isClosed: false,
       }));
+    const pricingRules =
+      input.regularPrice !== undefined
+        ? buildTierPricingRules({
+            regularPrice: input.regularPrice,
+            peakPrice: input.peakPrice,
+            peakStartsAt: input.peakStartsAt,
+            weekendPrice: input.weekendPrice,
+          })
+        : undefined;
     return this.prisma.venueResource.create({
       data: {
         venueId,
@@ -341,19 +354,7 @@ export class VenuesService {
         maxDurationMinutes: input.maxDurationMinutes,
         sortOrder: input.sortOrder ?? count,
         operatingHours: { create: hours },
-        pricingRules: template?.pricingRules.length
-          ? {
-              create: template.pricingRules.map((rule) => ({
-                name: rule.name,
-                dayOfWeek: rule.dayOfWeek,
-                startsAt: rule.startsAt,
-                endsAt: rule.endsAt,
-                priceAmount: rule.priceAmount,
-                isDefault: rule.isDefault,
-                sortOrder: rule.sortOrder,
-              })),
-            }
-          : undefined,
+        pricingRules: pricingRules ? { create: pricingRules } : undefined,
       },
       include: { operatingHours: true, pricingRules: true, venueType: true },
     });

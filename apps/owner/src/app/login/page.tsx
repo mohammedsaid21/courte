@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { AuthFrame } from "@/components/auth-frame";
 import { Button, Field, Input } from "@/components/ui";
+import { blockPlayerAccountFromOwnerPortal } from "@/lib/portal-access";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -18,9 +19,13 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      const { error } = await createClient().auth.signInWithPassword({ email, password });
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast.error(error.message);
+        return;
+      }
+      if (!(await blockPlayerAccountFromOwnerPortal(router))) {
         return;
       }
       router.replace("/home");

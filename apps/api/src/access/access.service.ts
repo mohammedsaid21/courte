@@ -29,6 +29,8 @@ export class AccessService {
       return { venue, role: "OWNER" };
     }
 
+    this.assertOwnerAccount(user);
+
     const membership = await this.prisma.venueMember.findUnique({
       where: { venueId_userId: { venueId, userId: user.id } },
       include: { venue: true },
@@ -44,7 +46,18 @@ export class AccessService {
 
   assertOwnerAccount(user: User) {
     if (user.accountKind === "CUSTOMER") {
-      throw new ForbiddenException("This action is for venue owners");
+      throw new ForbiddenException(
+        "هذا الحساب للاعبين. استخدم موقع الحجز وليس بوابة أصحاب الملاعب.",
+      );
+    }
+    return user;
+  }
+
+  assertPlayerAccount(user: User) {
+    if (user.accountKind === "OWNER") {
+      throw new ForbiddenException(
+        "هذا حساب لإدارة الملاعب وليس حسابًا شخصيًا للحجز. سجّل الدخول من بوابة أصحاب الملاعب.",
+      );
     }
     return user;
   }

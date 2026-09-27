@@ -384,6 +384,7 @@ export class BookingsService {
   }
 
   async createAsCustomer(user: User, input: CreateCustomerBookingInput) {
+    this.access.assertPlayerAccount(user);
     if (!user.fullName || !user.phone) {
       throw new BadRequestException("Add your name and phone number to your profile before booking.");
     }
@@ -418,6 +419,7 @@ export class BookingsService {
   }
 
   async createManyAsCustomer(user: User, input: CreateCustomerBookingsBatchInput) {
+    this.access.assertPlayerAccount(user);
     const created: Awaited<ReturnType<typeof this.createAsCustomer>>[] = [];
     for (const booking of input.bookings) {
       created.push(await this.createAsCustomer(user, booking));
@@ -425,7 +427,17 @@ export class BookingsService {
     return created;
   }
 
+  async cancelManyMine(user: User, bookingIds: string[]) {
+    this.access.assertPlayerAccount(user);
+    const cancelled: Awaited<ReturnType<typeof this.cancelMine>>[] = [];
+    for (const bookingId of bookingIds) {
+      cancelled.push(await this.cancelMine(user, bookingId));
+    }
+    return cancelled;
+  }
+
   async listMine(user: User) {
+    this.access.assertPlayerAccount(user);
     const bookings = await this.prisma.booking.findMany({
       where: { createdByUserId: user.id, source: "CUSTOMER" },
       include: bookingInclude,
@@ -436,6 +448,7 @@ export class BookingsService {
   }
 
   async getMine(user: User, bookingId: string) {
+    this.access.assertPlayerAccount(user);
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: bookingInclude,
@@ -447,6 +460,7 @@ export class BookingsService {
   }
 
   async cancelMine(user: User, bookingId: string) {
+    this.access.assertPlayerAccount(user);
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: { venue: true },

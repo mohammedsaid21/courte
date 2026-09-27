@@ -13,13 +13,18 @@ import {
   durationPayload,
 } from "@courte/shared";
 import {
+  Building2,
   Camera,
   Check,
   ChevronLeft,
   ChevronRight,
   ImagePlus,
+  LayoutGrid,
   MapPin,
+  MapPinned,
   Moon,
+  Rocket,
+  Sparkles,
   Sun,
   Wallet,
   X,
@@ -35,6 +40,7 @@ import { CITY_AR, catalogName } from "@/lib/ar";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { setStoredVenueId } from "@/lib/venue-storage";
+import { blockPlayerAccountFromOwnerPortal } from "@/lib/portal-access";
 import {
   ONBOARDING_STEPS,
   clearOnboardingForm,
@@ -55,6 +61,15 @@ const defaultHours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
 }));
 
 const MAX_PHOTOS = 8;
+
+const STEP_ICONS = [Building2, MapPinned, LayoutGrid, Rocket] as const;
+
+const STEP_SUBTITLES = [
+  "اسم الملعب، المدينة، والتواصل — أول انطباع يظهر للزبائن في البحث.",
+  "ثبّت موقعك على الخريطة وأضف صوراً تبيع الملعب قبل أول حجز.",
+  "حجم الملعب، العشب، والمدة — أساس جدول الحجوزات والأسعار.",
+  "راجع الملخص، حدّد الأسعار، ثم انشر وابدأ من الجدول.",
+] as const;
 
 type LocalPhoto = { id: string; file: File; preview: string };
 
@@ -103,20 +118,75 @@ function PriceField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="text-sm font-bold text-slate-900">{label}</div>
-      <div className="mt-0.5 text-xs text-slate-500">{hint}</div>
-      <div className="mt-3 flex items-center gap-2">
+    <label className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-brand/40 hover:shadow-md">
+      <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+        <div className="text-sm font-black text-slate-900">{label}</div>
+        <div className="mt-0.5 text-xs font-medium text-slate-500">{hint}</div>
+      </div>
+      <div className="flex items-baseline gap-2 px-4 py-4">
         <Input
           type="number"
           min={0}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
-          className="border-0 bg-white text-2xl font-black"
+          className="border-0 bg-transparent p-0 text-3xl font-black tabular-nums shadow-none focus:ring-0"
         />
         <span className="text-sm font-bold text-slate-400">₪</span>
       </div>
     </label>
+  );
+}
+
+function StepNav({
+  step,
+  onGo,
+  canJump,
+}: {
+  step: number;
+  onGo: (index: number) => void;
+  canJump: (index: number) => boolean;
+}) {
+  return (
+    <nav className="space-y-1" aria-label="خطوات الإعداد">
+      {ONBOARDING_STEPS.map((item, index) => {
+        const done = index < step;
+        const active = index === step;
+        const Icon = STEP_ICONS[index];
+        const clickable = index <= step || canJump(index);
+        return (
+          <button
+            key={item.id}
+            type="button"
+            disabled={!clickable}
+            onClick={() => {
+              if (clickable) onGo(index);
+            }}
+            className={cn(
+              "flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-start transition",
+              active && "bg-slate-900 text-white shadow-lg shadow-slate-900/15",
+              !active && done && "bg-white text-slate-800 ring-1 ring-slate-200",
+              !active && !done && "text-slate-400",
+              !clickable && "cursor-not-allowed opacity-50",
+            )}
+          >
+            <span
+              className={cn(
+                "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                active ? "bg-brand text-slate-900" : done ? "bg-brand/20 text-brand-800" : "bg-slate-100 text-slate-400",
+              )}
+            >
+              {done ? <Check size={18} strokeWidth={3} /> : <Icon size={18} />}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-bold uppercase tracking-wide opacity-70">
+                {index + 1}. {item.hint}
+              </span>
+              <span className="mt-0.5 block text-sm font-black">{item.title}</span>
+            </span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -172,9 +242,13 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     void (async () => {
-      const session = await createClient().auth.getSession();
+      const supabase = createClient();
+      const session = await supabase.auth.getSession();
       if (!session.data.session) {
         router.replace("/signup");
+        return;
+      }
+      if (!(await blockPlayerAccountFromOwnerPortal(router))) {
         return;
       }
       const [venueTypes, amenityList] = await Promise.all([ownerApi.venueTypes(), ownerApi.amenities()]);
@@ -364,74 +438,124 @@ export default function OnboardingPage() {
 
   const progress = ((step + 1) / ONBOARDING_STEPS.length) * 100;
   const durationLabel = form.duration === 90 ? "ساعة ونصف" : "ساعة";
+  const StepIcon = STEP_ICONS[step];
+  const selectedTypes = types.filter((type) => form.venueTypeIds.includes(type.id));
+
+  function tryGoTo(index: number) {
+    if (index > step && !canGoNext()) return;
+    if (index === step + 1 && step === 1 && !form.acceptsOnlineBooking) {
+      goTo(ONBOARDING_STEPS.length - 1);
+      return;
+    }
+    goTo(index);
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-slate-100">
+        <div className="mx-auto max-w-5xl animate-pulse px-4 py-10">
+          <div className="h-10 w-40 rounded-xl bg-slate-200" />
+          <div className="mt-8 h-32 rounded-3xl bg-slate-200" />
+          <div className="mt-6 h-96 rounded-3xl bg-slate-200" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#ecfdf5_0%,#f1f5f9_220px)]">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
-          <div>
-            <div className="text-xl font-black italic tracking-wider text-slate-900">
-              COURTE<span className="text-brand">.</span>
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_#d1fae5_0%,_#f1f5f9_45%,_#f8fafc_100%)]">
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-4">
+          <div className="flex items-center gap-3">
+            <div className="hidden h-10 w-1 rounded-full bg-brand sm:block" />
+            <div>
+              <div className="text-lg font-black italic tracking-wider text-slate-900 sm:text-xl">
+                COURTE<span className="text-brand">.</span>
+              </div>
+              <p className="text-[11px] font-bold text-slate-400">إعداد ملعبك · دقائق معدودة</p>
             </div>
-            <p className="text-[11px] font-bold text-slate-400">إعداد الملعب</p>
           </div>
-          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
-            {step + 1} / {ONBOARDING_STEPS.length}
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs font-bold text-slate-400 sm:inline">
+              {Math.round(progress)}%
+            </span>
+            <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-black text-white">
+              {step + 1} / {ONBOARDING_STEPS.length}
+            </span>
           </div>
         </div>
-        <div className="h-1 bg-slate-200">
-          <div className="h-full bg-brand transition-all" style={{ width: `${progress}%` }} />
+        <div className="h-1 bg-slate-200/80">
+          <div className="h-full bg-gradient-to-l from-brand to-emerald-400 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
         </div>
       </header>
 
-      <div className="mx-auto max-w-3xl px-4 py-8 pb-36">
-        <div className="mb-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-brand-700">{ONBOARDING_STEPS[step].hint}</p>
-          <h1 className="mt-1 font-display text-3xl font-extrabold text-slate-900">{ONBOARDING_STEPS[step].title}</h1>
-        </div>
+      <div className="mx-auto grid max-w-5xl gap-8 px-4 py-6 pb-40 lg:grid-cols-[17rem_minmax(0,1fr)] lg:py-10">
+        <aside className="hidden lg:block">
+          <div className="sticky top-28 space-y-6">
+            <StepNav step={step} onGo={tryGoTo} canJump={(index) => index <= step || canGoNext()} />
+            <div className="rounded-2xl border border-brand/30 bg-brand/10 p-4">
+              <div className="flex items-start gap-2">
+                <Sparkles size={16} className="mt-0.5 shrink-0 text-brand-800" />
+                <p className="text-xs font-semibold leading-relaxed text-slate-700">
+                  يمكنك الخروج والعودة — نحفظ بياناتك على هذا الجهاز حتى تنشر الملعب.
+                </p>
+              </div>
+            </div>
+          </div>
+        </aside>
 
-        <div className="mb-6 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:overflow-visible">
-          {ONBOARDING_STEPS.map((item, index) => {
-            const done = index < step;
-            const active = index === step;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  if (index <= step || canGoNext()) goTo(index);
-                }}
-                className={cn(
-                  "min-w-[9.5rem] rounded-2xl border px-3 py-3 text-start sm:min-w-0",
-                  active
-                    ? "border-brand bg-white shadow-sm"
-                    : done
-                      ? "border-slate-200 bg-white"
-                      : "border-transparent bg-white/60",
-                )}
-              >
-                <div className="flex items-center gap-2 text-xs font-bold">
-                  <span
-                    className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
-                      active || done ? "bg-brand text-slate-900" : "bg-slate-200 text-slate-500",
-                    )}
-                  >
-                    {done ? <Check size={14} /> : index + 1}
-                  </span>
-                  <span className={active ? "text-slate-900" : "text-slate-500"}>{item.title}</span>
+        <div className="min-w-0">
+          <div className="mb-6 overflow-hidden rounded-[28px] bg-slate-900 text-white shadow-xl shadow-slate-900/20">
+            <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+              <div className="flex items-start gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand text-slate-900 shadow-lg shadow-brand/30">
+                  <StepIcon size={26} strokeWidth={2.25} />
+                </span>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-bright">
+                    {ONBOARDING_STEPS[step].hint}
+                  </p>
+                  <h1 className="mt-1 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+                    {ONBOARDING_STEPS[step].title}
+                  </h1>
+                  <p className="mt-2 max-w-xl text-sm font-medium leading-relaxed text-white/65">
+                    {STEP_SUBTITLES[step]}
+                  </p>
                 </div>
-              </button>
-            );
-          })}
-        </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+            {ONBOARDING_STEPS.map((item, index) => {
+              const done = index < step;
+              const active = index === step;
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "min-w-[7.5rem] shrink-0 rounded-2xl border px-3 py-2.5",
+                    active ? "border-slate-900 bg-slate-900 text-white" : done ? "border-slate-200 bg-white" : "border-transparent bg-white/70 text-slate-400",
+                  )}
+                >
+                  <div className="text-[10px] font-bold uppercase opacity-80">{item.hint}</div>
+                  <div className="text-sm font-black">{item.title}</div>
+                </div>
+              );
+            })}
+          </div>
 
         <form className="space-y-5" onSubmit={onSubmit}>
           {step === 0 && (
-            <section className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">بيانات الملعب</h2>
-                <p className="mt-1 text-sm text-slate-500">هذا ما يراه الزبائن عند البحث والحجز.</p>
+            <section className="space-y-6 rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-8">
+              <div className="flex items-start gap-3 border-b border-slate-100 pb-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-brand">
+                  <Building2 size={20} />
+                </span>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">هوية الملعب</h2>
+                  <p className="mt-1 text-sm text-slate-500">يظهر في نتائج البحث وصفحة الحجز.</p>
+                </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="اسم الملعب بالعربية">
@@ -658,7 +782,17 @@ export default function OnboardingPage() {
           )}
 
           {step === 2 && (
-            <section className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            form.acceptsOnlineBooking ? (
+            <section className="space-y-6 rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-8">
+              <div className="flex items-start gap-3 border-b border-slate-100 pb-5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-brand">
+                  <LayoutGrid size={20} />
+                </span>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">أول ملعب قابل للحجز</h2>
+                  <p className="mt-1 text-sm text-slate-500">يمكنك إضافة ملاعب أخرى بأسعار مختلفة لاحقاً.</p>
+                </div>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="اسم المساحة بالعربية">
                   <Input required value={form.resourceName} onChange={(e) => setForm({ ...form, resourceName: e.target.value })} />
@@ -723,41 +857,80 @@ export default function OnboardingPage() {
                 </span>
               </button>
             </section>
+            ) : (
+              <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-8 text-center">
+                <p className="font-bold text-slate-800">لا حاجة لمواصفات الحجز</p>
+                <p className="mt-2 text-sm text-slate-500">فعّلت «عرض فقط». انتقل للمراجعة لإنهاء الإعداد.</p>
+                <Button type="button" className="mt-4" onClick={() => goTo(ONBOARDING_STEPS.length - 1)}>
+                  الذهاب للمراجعة
+                </Button>
+              </div>
+            )
           )}
 
           {step === 3 && (
             <section className="space-y-5">
-              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-                {cover && (
+              <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-lg shadow-slate-200/50">
+                {cover ? (
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={cover.preview} alt="" className="h-40 w-full object-cover" />
+                    <img src={cover.preview} alt="" className="h-44 w-full object-cover sm:h-52" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-brand-bright">معاينة الزبائن</p>
+                      <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl">{form.name || "ملعبك"}</h2>
+                      <p className="mt-1 text-sm font-medium text-white/75">
+                        {CITY_AR[form.city] ?? form.city} · {form.address || "العنوان"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-b border-slate-100 bg-slate-50 p-6 sm:p-8">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">معاينة الزبائن</p>
+                    <h2 className="mt-1 text-2xl font-black text-slate-900">{form.name || "ملعبك"}</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {CITY_AR[form.city] ?? form.city} · {form.address || "العنوان"}
+                    </p>
                   </div>
                 )}
                 <div className="p-5 sm:p-7">
-                  <p className="text-xs font-bold text-slate-400">ملخص الملعب</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-900">{form.name || "ملعبك"}</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {CITY_AR[form.city] ?? form.city} · {form.address}
-                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTypes.map((type) => (
+                      <span key={type.id} className="rounded-full bg-brand/15 px-3 py-1 text-xs font-black text-brand-900">
+                        {catalogName(type)}
+                      </span>
+                    ))}
+                    {form.acceptsOnlineBooking ? (
+                      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black text-white">حجز أونلاين</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-black text-slate-600">عرض فقط</span>
+                    )}
+                  </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {[
-                      COURT_SIZE_LABELS[form.size].ar,
-                      COURT_SURFACE_LABELS[form.surface].ar,
-                      COURT_SETTING_LABELS[form.setting].ar,
-                      durationLabel,
-                      form.hasLights ? "إنارة" : "بدون إنارة",
-                      photos.length ? `${photos.length} صور` : "بدون صور",
-                    ].map((item) => (
+                    {(form.acceptsOnlineBooking
+                      ? [
+                          COURT_SIZE_LABELS[form.size].ar,
+                          COURT_SURFACE_LABELS[form.surface].ar,
+                          COURT_SETTING_LABELS[form.setting].ar,
+                          durationLabel,
+                          form.hasLights ? "إنارة" : "بدون إنارة",
+                          photos.length ? `${photos.length} صور` : "بدون صور",
+                        ]
+                      : [form.phone, photos.length ? `${photos.length} صور` : "بدون صور"]
+                    ).map((item) => (
                       <span key={item} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
                         {item}
                       </span>
                     ))}
                   </div>
+                  {form.description && (
+                    <p className="mt-4 text-sm leading-relaxed text-slate-600 line-clamp-3">{form.description}</p>
+                  )}
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              {form.acceptsOnlineBooking ? (
+              <div className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-8">
                 <div className="mb-4 flex items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/20 text-brand-700">
                     <Wallet size={18} />
@@ -788,8 +961,19 @@ export default function OnboardingPage() {
                   />
                 </div>
               </div>
+              ) : (
+                <div className="rounded-[28px] border border-dashed border-slate-300 bg-slate-50 p-6 text-center sm:p-8">
+                  <p className="text-sm font-bold text-slate-700">لم تفعّل الحجز عبر الموقع</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    سيظهر الملعب للتعريف مع الهاتف والعنوان. يمكنك تفعيل الحجز لاحقاً من الإعدادات.
+                  </p>
+                  <Button type="button" variant="outline" className="mt-4" onClick={() => goTo(0)}>
+                    تعديل خيار الحجز
+                  </Button>
+                </div>
+              )}
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-8">
                 <h2 className="text-lg font-bold text-slate-900">خدمات إضافية</h2>
                 <p className="mb-4 mt-1 text-sm text-slate-500">مواقف، غرف تبديل، كافتيريا وغيرها. اختياري.</p>
                 <div className="flex flex-wrap gap-2">
@@ -811,8 +995,8 @@ export default function OnboardingPage() {
             </section>
           )}
 
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
-            <div className="mx-auto flex max-w-3xl gap-3">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            <div className="mx-auto flex max-w-5xl gap-3 px-4 sm:px-0">
               {step > 0 && (
                 <Button type="button" variant="outline" className="min-w-28" onClick={() => goTo(step - 1)}>
                   <ChevronRight size={16} />
@@ -822,23 +1006,22 @@ export default function OnboardingPage() {
               {step < ONBOARDING_STEPS.length - 1 ? (
                 <Button
                   type="button"
-                  className="flex-1"
+                  className="flex-1 shadow-brand"
                   size="lg"
-                  onClick={() => {
-                    if (canGoNext()) goTo(step + 1);
-                  }}
+                  onClick={() => tryGoTo(step + 1)}
                 >
-                  التالي
+                  {step === 1 && !form.acceptsOnlineBooking ? "تخطّي إلى المراجعة" : "متابعة"}
                   <ChevronLeft size={16} />
                 </Button>
               ) : (
-                <Button className="flex-1" size="lg" disabled={loading}>
-                  {loading ? "جاري الحفظ…" : "افتح لوحة التحكم"}
+                <Button className="flex-1 shadow-brand" size="lg" disabled={loading}>
+                  {loading ? "جاري النشر…" : form.acceptsOnlineBooking ? "انشر وافتح الجدول" : "احفظ وافتح اللوحة"}
                 </Button>
               )}
             </div>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

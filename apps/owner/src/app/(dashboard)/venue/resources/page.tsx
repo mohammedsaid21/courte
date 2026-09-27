@@ -39,6 +39,9 @@ export default function ResourcesPage() {
   const [surface, setSurface] = useState<(typeof COURT_SURFACES)[number]>("ARTIFICIAL_GRASS");
   const [setting, setSetting] = useState<(typeof COURT_SETTINGS)[number]>("OUTDOOR");
   const [hasLights, setHasLights] = useState(true);
+  const [regularPrice, setRegularPrice] = useState(50);
+  const [peakPrice, setPeakPrice] = useState<number | "">("");
+  const [weekendPrice, setWeekendPrice] = useState<number | "">("");
   const [editing, setEditing] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +66,9 @@ export default function ResourcesPage() {
       surface,
       setting,
       hasLights,
+      regularPrice: Number(regularPrice),
+      peakPrice: peakPrice === "" ? null : Number(peakPrice),
+      weekendPrice: weekendPrice === "" ? null : Number(weekendPrice),
     });
     setName("");
     setNameEn("");
@@ -76,7 +82,7 @@ export default function ResourcesPage() {
     <div className="space-y-4">
       <Card>
         <h2 className="text-lg font-black text-slate-900">أضف ملعباً أو مساحة</h2>
-        <p className="mb-5 mt-1 text-sm font-medium text-slate-500">كل مساحة لها حجم ومواصفات ومدة حجز خاصة.</p>
+        <p className="mb-5 mt-1 text-sm font-medium text-slate-500">كل مساحة لها حجم ومواصفات ومدة حجز وسعر خاص.</p>
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="الاسم بالعربية"><Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="ملعب 1" /></Field>
@@ -109,6 +115,17 @@ export default function ResourcesPage() {
             <input type="checkbox" checked={hasLights} onChange={(e) => setHasLights(e.target.checked)} />
             إنارة ليلية
           </label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="السعر العادي (₪ / مدة الحجز)">
+              <Input type="number" min={0} required value={regularPrice} onChange={(e) => setRegularPrice(Number(e.target.value))} />
+            </Field>
+            <Field label="سعر الذروة (اختياري)">
+              <Input type="number" min={0} value={peakPrice} onChange={(e) => setPeakPrice(e.target.value === "" ? "" : Number(e.target.value))} placeholder="مثل 70" />
+            </Field>
+            <Field label="سعر الجمعة والسبت (اختياري)">
+              <Input type="number" min={0} value={weekendPrice} onChange={(e) => setWeekendPrice(e.target.value === "" ? "" : Number(e.target.value))} placeholder="مثل 80" />
+            </Field>
+          </div>
           <Button>إضافة مساحة</Button>
         </form>
       </Card>

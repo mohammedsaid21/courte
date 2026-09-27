@@ -6,6 +6,7 @@ import { FormEvent, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { AuthFrame } from "@/components/auth-frame";
 import { Button, Field, Input } from "@/components/ui";
+import { blockOwnerAccountFromPlayerPortal } from "@/lib/portal-access";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
@@ -19,13 +20,24 @@ function LoginForm() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
-    const { error } = await createClient().auth.signInWithPassword({ email, password });
-    setLoading(false);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      setLoading(false);
       toast.error("البريد أو كلمة المرور غير صحيحة.");
       return;
     }
-    router.replace(next.startsWith("/") ? next : "/account/bookings");
+    try {
+      if (!(await blockOwnerAccountFromPlayerPortal(router))) {
+        return;
+      }
+      router.replace(next.startsWith("/") ? next : "/account/bookings");
+    } catch {
+      await supabase.auth.signOut();
+      toast.error("تعذر التحقق من الحساب. حاول مرة أخرى.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

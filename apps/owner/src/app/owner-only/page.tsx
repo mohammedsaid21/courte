@@ -8,8 +8,11 @@ export default function OwnerOnlyPage() {
       <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
         <div className="text-4xl font-black italic tracking-tight">COURTE<span className="text-brand">.</span></div>
         <h1 className="mt-6 text-3xl font-black text-slate-900">هذه البوابة لأصحاب الملاعب</h1>
-        <p className="mt-3 text-sm font-medium text-slate-500">
-          حسابك مخصص لحجز الملاعب. سجّل الدخول من تطبيق اللاعبين لإدارة حجوزاتك.
+        <p className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
+          يبدو أنك دخلت بحساب شخصي للحجز كلاعب. هذا التطبيق مخصّص لإدارة الملاعب والحجوزات — وليس لحجز وقت لعب.
+        </p>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          للحجز كـ لاعب، استخدم موقع ميدان. ولإدارة ملعبك، أنشئ حساب صاحب ملعب أو سجّل الدخول بالحساب المناسب.
         </p>
         <ButtonLink href="/login" className="mt-6">
           العودة لتسجيل الدخول

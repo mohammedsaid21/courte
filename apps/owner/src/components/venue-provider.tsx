@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ApiError, Me, Venue, ownerApi } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredVenueId, setStoredVenueId } from "@/lib/venue-storage";
+import { blockPlayerAccountFromOwnerPortal } from "@/lib/portal-access";
 
 type VenueContextValue = {
   me: Me | null;
@@ -39,8 +40,7 @@ export function VenueProvider({ children }: { children: React.ReactNode }) {
         storedId ? ownerApi.venue(storedId).catch(() => null) : Promise.resolve(null),
       ]);
       setMe(profile);
-      if (profile.accountKind === "CUSTOMER" && profile.venues.length === 0) {
-        router.replace("/owner-only");
+      if (!(await blockPlayerAccountFromOwnerPortal(router, profile))) {
         setLoading(false);
         return;
       }

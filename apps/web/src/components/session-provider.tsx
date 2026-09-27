@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { customerService, type Me } from "@/lib/api";
+import { blockOwnerAccountFromPlayerPortal } from "@/lib/portal-access";
 import { createClient } from "@/lib/supabase/client";
 
 type SessionContextValue = {
@@ -22,6 +23,7 @@ function needsProfile(pathname: string) {
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       unsubscribe?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !session) return;
+    let cancelled = false;
+    void blockOwnerAccountFromPlayerPortal(router).then((allowed) => {
+      if (!cancelled && !allowed) {
+        setSession(null);
+        setMe(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, session?.user.id, router]);
 
   useEffect(() => {
     if (!loadProfile || !session) {

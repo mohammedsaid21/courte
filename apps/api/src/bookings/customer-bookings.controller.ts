@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
 import { User } from "@prisma/client";
-import { createCustomerBookingSchema, createCustomerBookingsBatchSchema } from "@courte/shared";
+import { createCustomerBookingSchema, createCustomerBookingsBatchSchema, cancelCustomerBookingsBatchSchema } from "@courte/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { ZodPipe } from "../common/zod.pipe";
 import { BookingsService } from "../bookings/bookings.service";
@@ -30,6 +30,15 @@ export class CustomerBookingsController {
     body: ReturnType<typeof createCustomerBookingsBatchSchema.parse>,
   ) {
     return this.bookings.createManyAsCustomer(user, body);
+  }
+
+  @Post("batch/cancel")
+  cancelBatch(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(cancelCustomerBookingsBatchSchema))
+    body: ReturnType<typeof cancelCustomerBookingsBatchSchema.parse>,
+  ) {
+    return this.bookings.cancelManyMine(user, body.bookingIds);
   }
 
   @Get(":bookingId")

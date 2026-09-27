@@ -23,6 +23,11 @@ export const bookingService = {
       body: JSON.stringify({ bookings }),
     }),
   cancel: (id: string) => api<CustomerBooking>(`/customer/bookings/${id}/cancel`, { method: "POST" }),
+  cancelBatch: (bookingIds: string[]) =>
+    api<CustomerBooking[]>("/customer/bookings/batch/cancel", {
+      method: "POST",
+      body: JSON.stringify({ bookingIds }),
+    }),
   previewRecurring: (body: RecurringBody) =>
     api<RecurringPlan>("/customer/recurring/preview", { method: "POST", body: JSON.stringify(body) }),
   createRecurring: (body: RecurringBody) =>

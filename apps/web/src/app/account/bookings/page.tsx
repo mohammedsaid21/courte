@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Alert, Tabs } from "@/components/ui";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/skeleton";
-import { Badge, ButtonLink } from "@/components/ui";
+import { Badge, Button, ButtonLink } from "@/components/ui";
 import { bookingService, userFacingMessage, type CustomerBooking } from "@/lib/api";
-import { formatDate, formatMoney, formatTime, statusLabel } from "@/lib/utils";
+import { cancellationCopy, formatDate, formatMoney, formatTime, statusLabel } from "@/lib/utils";
 
 type Tab = "upcoming" | "past" | "cancelled";
 
@@ -23,6 +24,7 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("upcoming");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     void bookingService
@@ -43,6 +45,25 @@ export default function BookingsPage() {
 
   const items = grouped[tab];
   const nextGame = grouped.upcoming[0];
+
+  async function cancelBooking(booking: CustomerBooking, event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const ok = window.confirm(
+      `${cancellationCopy(booking.cancellationHours, booking.cancellationPolicy)}\n\nإلغاء حجز ${booking.resource.name}؟`,
+    );
+    if (!ok) return;
+    setCancellingId(booking.id);
+    try {
+      const updated = await bookingService.cancel(booking.id);
+      setBookings((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      toast.success("تم إلغاء الحجز.");
+    } catch (error) {
+      toast.error(userFacingMessage(error));
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 md:px-6">
@@ -100,7 +121,20 @@ export default function BookingsPage() {
                 {formatDate(booking.startsAt, booking.venue.timezone)} · {formatTime(booking.startsAt, booking.venue.timezone)}–
                 {formatTime(booking.endsAt, booking.venue.timezone)}
               </div>
-              <div className="mt-1 text-sm font-bold">{formatMoney(booking.priceAmount)}</div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-bold">{formatMoney(booking.priceAmount)}</span>
+                {booking.canCancel && tab === "upcoming" && (
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    disabled={cancellingId === booking.id}
+                    onClick={(event) => void cancelBooking(booking, event)}
+                  >
+                    {cancellingId === booking.id ? "جارٍ الإلغاء…" : "إلغاء"}
+                  </Button>
+                )}
+              </div>
             </Link>
           ))}
         </div>
