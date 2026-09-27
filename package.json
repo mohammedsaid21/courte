@@ -10,6 +10,7 @@
     "dev:web": "pnpm --filter @courte/web dev",
     "build": "pnpm -r run build",
     "build:shared": "pnpm --filter @courte/shared build",
+    "build:api": "pnpm run build:shared && pnpm --filter @courte/api exec prisma generate && pnpm --filter @courte/api exec prisma migrate deploy && pnpm --filter @courte/api build",
     "lint": "pnpm --filter @courte/api --filter @courte/owner --filter @courte/web lint",
     "typecheck": "pnpm run build:shared && pnpm --filter @courte/api --filter @courte/owner --filter @courte/web typecheck",
     "test": "pnpm --filter @courte/api test",
