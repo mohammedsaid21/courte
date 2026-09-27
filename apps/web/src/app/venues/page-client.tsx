@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert } from "@/components/ui";
 import { EmptyState } from "@/components/empty-state";
+import { useSession } from "@/components/session-provider";
 import { SearchPanel, SportFilter } from "@/components/search-panel";
 import { VenueCardSkeleton } from "@/components/skeleton";
+import { VenuesGuestPreview } from "@/components/venues-guest-preview";
 import { Button } from "@/components/ui";
 import { VenueCard } from "@/components/venue-card";
 import { userFacingMessage, venueService, type CatalogItem, type DiscoverVenue } from "@/lib/api";
@@ -16,10 +18,13 @@ const PAGE_SIZE = 12;
 export default function VenuesPage() {
   const router = useRouter();
   const params = useSearchParams();
+  const { session, loading: authLoading } = useSession();
+  const authed = Boolean(session);
+
   const [items, setItems] = useState<DiscoverVenue[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [types, setTypes] = useState<CatalogItem[]>([]);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
@@ -42,14 +47,23 @@ export default function VenuesPage() {
   );
 
   useEffect(() => {
+    if (!authed) return;
     void venueService.types().then(setTypes).catch(() => setTypes([]));
-  }, []);
+  }, [authed]);
 
   useEffect(() => {
     setPage(1);
   }, [params]);
 
   useEffect(() => {
+    if (!authed) {
+      setItems([]);
+      setTotal(0);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -80,9 +94,10 @@ export default function VenuesPage() {
     return () => {
       cancelled = true;
     };
-  }, [query, page, coords]);
+  }, [authed, query, page, coords]);
 
   function setType(typeId: string) {
+    if (!authed) return;
     const next = new URLSearchParams(params.toString());
     if (typeId) next.set("typeId", typeId);
     else next.delete("typeId");
@@ -90,6 +105,7 @@ export default function VenuesPage() {
   }
 
   function useLocation() {
+    if (!authed) return;
     if (!navigator.geolocation) {
       setLocationMessage("اختر مدينة. الموقع غير متاح على هذا الجهاز.");
       return;
@@ -109,68 +125,90 @@ export default function VenuesPage() {
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 md:px-6">
-      <div className="max-w-2xl">
-        <h1 className="text-h1">ابحث عن ملعب</h1>
-        <p className="mt-2 text-body">فلتر حسب المدينة والمنطقة والحجم والأوقات المتاحة ثم احجز.</p>
-      </div>
-      <SearchPanel initial={query} compact />
-      <SportFilter types={types} value={query.typeId} onChange={setType} />
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" size="sm" onClick={useLocation}>
-          قربي
-        </Button>
-        {locationMessage && <p className="text-sm text-text-muted">{locationMessage}</p>}
-      </div>
-      {error && <Alert tone="danger" description={error} />}
-      {loading ? (
+  if (authLoading) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 md:px-6">
+        <div className="h-10 w-48 animate-pulse rounded-lg bg-pitch-mist" />
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <VenueCardSkeleton key={index} />
           ))}
         </div>
-      ) : items.length === 0 ? (
-        <EmptyState
-          title="لا يوجد ملعب بهذه الفلاتر"
-          body={
-            query.dateTo
-              ? "لا توجد أوقات شاغرة خلال هذه الفترة. جرّب مدينة أو حجمًا آخر."
-              : query.date
-              ? "لا توجد أوقات في هذا اليوم. جرّب يومًا أو مدينة أخرى."
-              : "جرّب مدينة أو حجمًا أو منطقة مختلفة."
-          }
-        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 md:px-6">
+      <div className="max-w-2xl">
+        <h1 className="text-h1">ابحث عن ملعب</h1>
+        <p className="mt-2 text-body">
+          {authed
+            ? "فلتر حسب المدينة والمنطقة والحجم والأوقات المتاحة ثم احجز."
+            : "صفحة الاستكشاف متاحة للجميع — القائمة والحجز بعد تسجيل الدخول."}
+        </p>
+      </div>
+
+      {!authed ? (
+        <VenuesGuestPreview />
       ) : (
         <>
-          <p className="text-sm font-bold text-text-muted">
-            {total} ملعب
-          </p>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((venue) => (
-              <VenueCard key={venue.id} venue={venue} />
-            ))}
+          <SearchPanel initial={query} compact />
+          <SportFilter types={types} value={query.typeId} onChange={setType} />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" size="sm" onClick={useLocation}>
+              قربي
+            </Button>
+            {locationMessage && <p className="text-sm text-text-muted">{locationMessage}</p>}
           </div>
-          {pageCount > 1 && (
-            <div className="flex items-center justify-center gap-3">
-              <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
-                السابق
-              </Button>
-              <span className="text-sm text-text-muted">
-                {page} / {pageCount}
-              </span>
-              <Button variant="secondary" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>
-                التالي
-              </Button>
+          {error && <Alert tone="danger" description={error} />}
+          {loading ? (
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <VenueCardSkeleton key={index} />
+              ))}
             </div>
+          ) : items.length === 0 ? (
+            <EmptyState
+              title="لا يوجد ملعب بهذه الفلاتر"
+              body={
+                query.dateTo
+                  ? "لا توجد أوقات شاغرة خلال هذه الفترة. جرّب مدينة أو حجمًا آخر."
+                  : query.date
+                    ? "لا توجد أوقات في هذا اليوم. جرّب يومًا أو مدينة أخرى."
+                    : "جرّب مدينة أو حجمًا أو منطقة مختلفة."
+              }
+            />
+          ) : (
+            <>
+              <p className="text-sm font-bold text-text-muted">{total} ملعب</p>
+              <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((venue) => (
+                  <VenueCard key={venue.id} venue={venue} />
+                ))}
+              </div>
+              {pageCount > 1 && (
+                <div className="flex items-center justify-center gap-3">
+                  <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+                    السابق
+                  </Button>
+                  <span className="text-sm text-text-muted">
+                    {page} / {pageCount}
+                  </span>
+                  <Button variant="secondary" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>
+                    التالي
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+          {(query.date || query.dateTo) && (
+            <p className="text-sm text-text-muted">
+              تظهر الملاعب التي فيها وقت شاغر
+              {query.dateTo ? " خلال هذا الأسبوع." : query.date === todayYmd() ? " اليوم." : " في التاريخ المحدد."}
+            </p>
           )}
         </>
-      )}
-      {(query.date || query.dateTo) && (
-        <p className="text-sm text-text-muted">
-          تظهر الملاعب التي فيها وقت شاغر
-          {query.dateTo ? " خلال هذا الأسبوع." : query.date === todayYmd() ? " اليوم." : " في التاريخ المحدد."}
-        </p>
       )}
     </div>
   );

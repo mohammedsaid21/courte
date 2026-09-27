@@ -5,7 +5,8 @@ export async function middleware(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const { pathname, search } = request.nextUrl;
 
-  if (pathname === "/venues" || pathname.startsWith("/venues/")) {
+  // Public listing at /venues; details and booking require sign-in.
+  if (pathname.startsWith("/venues/")) {
     if (!user) {
       const login = request.nextUrl.clone();
       login.pathname = "/login";
@@ -19,5 +20,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/venues", "/venues/:path*"],
+  matcher: ["/venues/:path*"],
 };

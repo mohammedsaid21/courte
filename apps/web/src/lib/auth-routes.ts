@@ -8,6 +8,7 @@ export function signupWithNext(next: string) {
   return `/signup?next=${encodeURIComponent(next)}`;
 }
 
-export function exploreVenuesHref(isAuthenticated: boolean) {
-  return isAuthenticated ? VENUE_DISCOVERY_PATH : loginWithNext(VENUE_DISCOVERY_PATH);
+/** Listing is public; guests see a preview and sign-in prompt on /venues. */
+export function exploreVenuesHref(_isAuthenticated: boolean) {
+  return VENUE_DISCOVERY_PATH;
 }

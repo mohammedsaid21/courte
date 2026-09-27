@@ -4,7 +4,7 @@ import { COURT_SIZES, cityAr } from "@/lib/ar";
 import type { DiscoverVenue } from "@/lib/api";
 import { VenuePlaceholder } from "./court-field";
 
-export function VenueCard({ venue }: { venue: DiscoverVenue }) {
+export function VenueCard({ venue, preview = false }: { venue: DiscoverVenue; preview?: boolean }) {
   const sport =
     venue.types.map((type) => type.nameAr || type.name).filter(Boolean).join(" · ") || "رياضة";
   const size = venue.sizes?.[0];
@@ -12,8 +12,15 @@ export function VenueCard({ venue }: { venue: DiscoverVenue }) {
 
   const imageUrl = venueCoverUrl(venue);
 
+  const href = preview ? "#" : `/venues/${venue.slug}`;
+
   return (
-    <Link href={`/venues/${venue.slug}`} className="group block overflow-hidden rounded-[12px] border border-white/80 bg-white shadow-glass">
+    <Link
+      href={href}
+      className={`group block overflow-hidden rounded-[12px] border border-white/80 bg-white shadow-glass ${preview ? "pointer-events-none" : ""}`}
+      aria-disabled={preview}
+      onClick={preview ? (e) => e.preventDefault() : undefined}
+    >
       <div className="relative aspect-[16/10] overflow-hidden bg-pitch-light">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -25,8 +32,13 @@ export function VenueCard({ venue }: { venue: DiscoverVenue }) {
         ) : (
           <VenuePlaceholder name={venue.name} className="h-full w-full" />
         )}
-        <div className="absolute start-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold text-pitch backdrop-blur">
-          {venue.open ? "مفتوح الآن" : venue.hoursLabel || "ساعات متفاوتة"}
+        <div className="absolute start-3 top-3 flex flex-wrap gap-1">
+          {preview && (
+            <span className="rounded-full bg-arena-lime px-2.5 py-1 text-[11px] font-black text-arena-stadium">مثال توضيحي</span>
+          )}
+          <span className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-bold text-pitch backdrop-blur">
+            {preview ? venue.hoursLabel : venue.open ? "مفتوح الآن" : venue.hoursLabel || "ساعات متفاوتة"}
+          </span>
         </div>
       </div>
       <div className="space-y-2 p-4">
