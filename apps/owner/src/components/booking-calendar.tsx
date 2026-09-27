@@ -1,7 +1,7 @@
 "use client";
 
 import { addDays, addMinutes, format } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { DateChips } from "@/components/date-chips";
 import { EmptyState } from "@/components/empty-state";
 import { HourSlot, type HourSlotState } from "@/components/hour-slot";
-import { PageHeader } from "@/components/page-header";
+import { KpiCard, PageHeader, ResourcePills } from "@/components/page-header";
 import { Badge, Button, Field, Input, Label, Select, Textarea } from "@/components/ui";
 import {
   CalendarBooking,
@@ -111,53 +111,86 @@ export function BookingCalendar() {
   }
 
   if (!data) {
-    return <div className="py-16 text-center text-text-muted">جاري تحميل الجدول…</div>;
+    return <CalendarSkeleton />;
   }
 
+  const dayStats = summarizeCalendarDay(data, view === "day" ? date : from);
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageHeader
         title="الجدول"
+        kicker="تشغيل الملعب"
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg bg-night p-1">
-              <button className={cn("rounded-md px-3 py-1.5 text-sm font-black", view === "day" ? "bg-brand text-slate-900" : "text-white/70")} onClick={() => setView("day")}>
-                يوم
-              </button>
-              <button className={cn("rounded-md px-3 py-1.5 text-sm font-black", view === "week" ? "bg-brand text-slate-900" : "text-white/70")} onClick={() => setView("week")}>
-                أسبوع
-              </button>
-            </div>
-            <div className="flex items-center gap-1 rounded-lg border border-border bg-white p-1">
-              <Button variant="ghost" size="sm" onClick={() => setDate(format(addDays(new Date(`${date}T00:00:00`), view === "week" ? -7 : -1), "yyyy-MM-dd"))}>
-                <ChevronLeft size={16} />
-              </Button>
-              <Input className="w-auto min-w-40 border-0 bg-transparent" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              <Button variant="ghost" size="sm" onClick={() => setDate(format(addDays(new Date(`${date}T00:00:00`), view === "week" ? 7 : 1), "yyyy-MM-dd"))}>
-                <ChevronRight size={16} />
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setDate(todayYmd())}>اليوم</Button>
-            </div>
+          <div className="flex rounded-xl bg-night p-1 shadow-sm">
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-black transition",
+                view === "day" ? "bg-brand text-slate-900 shadow-brand" : "text-white/70 hover:text-white",
+              )}
+              onClick={() => setView("day")}
+            >
+              <LayoutGrid size={15} />
+              يوم
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-black transition",
+                view === "week" ? "bg-brand text-slate-900 shadow-brand" : "text-white/70 hover:text-white",
+              )}
+              onClick={() => setView("week")}
+            >
+              <CalendarDays size={15} />
+              أسبوع
+            </button>
           </div>
         }
       />
+
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setDate(format(addDays(new Date(`${date}T00:00:00`), view === "week" ? -7 : -1), "yyyy-MM-dd"))}>
+              <ChevronLeft size={16} />
+            </Button>
+            <Input
+              className="min-w-40 border-slate-200 bg-slate-50 font-bold"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <Button variant="ghost" size="sm" onClick={() => setDate(format(addDays(new Date(`${date}T00:00:00`), view === "week" ? 7 : 1), "yyyy-MM-dd"))}>
+              <ChevronRight size={16} />
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setDate(todayYmd())}>اليوم</Button>
+          </div>
+          <Legend />
+        </div>
+      </section>
+
       <DateChips value={date} onChange={setDate} />
-      {presetCustomer && (
-        <div className="rounded-xl border border-brand/40 bg-brand-light px-4 py-3 text-sm font-semibold text-slate-900">
-          حجز لـ {presetCustomer.name} ({presetCustomer.phone}). اضغط ساعة فارغة للتأكيد.
+
+      {view === "day" && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <KpiCard label="حجوزات اليوم" value={String(dayStats.bookings)} hint={`${dayStats.pending} قيد الانتظار`} />
+          <KpiCard label="إيراد متوقع" value={dayStats.revenue.toFixed(0)} hint="د.أ من الحجوزات المعروضة" />
+          <KpiCard label="ساعات مشغولة" value={`${dayStats.occupiedHours}س`} hint={`${dayStats.availableSlots} خانة متاحة`} />
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Select className="w-56" value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
-          <option value="all">كل المساحات</option>
-          {venue.resources.map((resource) => (
-            <option key={resource.id} value={resource.id}>
-              {resource.name}
-            </option>
-          ))}
-        </Select>
-        <Legend />
-      </div>
+
+      {presetCustomer && (
+        <div className="rounded-2xl border border-brand/40 bg-brand-light px-5 py-4 text-sm font-semibold text-slate-900 shadow-sm">
+          حجز لـ <span className="font-black">{presetCustomer.name}</span> ({presetCustomer.phone}). اضغط ساعة فارغة للتأكيد.
+        </div>
+      )}
+
+      <ResourcePills
+        items={[{ id: "all", name: "كل المساحات" }, ...venue.resources]}
+        value={resourceId}
+        onChange={setResourceId}
+      />
       {view === "day" ? (
         <DayBoard data={data} onSlot={openSlot} onBooking={(booking) => router.push(`/bookings/${booking.id}`)} />
       ) : (
@@ -216,6 +249,48 @@ function slotState(booking?: CalendarBooking, blocked?: boolean): HourSlotState 
   return "booked";
 }
 
+function summarizeCalendarDay(data: CalendarResponse, focusDate: string) {
+  let bookings = 0;
+  let pending = 0;
+  let revenue = 0;
+  let occupiedHours = 0;
+  let availableSlots = 0;
+
+  for (const resource of data.resources) {
+    const day = resource.days.find((item) => item.date === focusDate) ?? resource.days[0];
+    if (!day || day.closed) continue;
+    for (const booking of day.bookings) {
+      if (booking.status === "CANCELLED") continue;
+      bookings += 1;
+      if (booking.status === "PENDING") pending += 1;
+      revenue += booking.priceAmount;
+      occupiedHours += booking.durationMinutes / 60;
+    }
+    for (const slot of day.slots) {
+      const booked = overlappingBooking(day.bookings, slot.start, slot.end);
+      const blocked = Boolean(day.blocks.find((item) => item.start < slot.end && item.end > slot.start) || slot.status === "blocked");
+      if (!booked && !blocked) availableSlots += 1;
+    }
+  }
+
+  return { bookings, pending, revenue, occupiedHours: Math.round(occupiedHours * 10) / 10, availableSlots };
+}
+
+function CalendarSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
+      <div className="h-16 animate-pulse rounded-2xl bg-slate-100" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+      </div>
+      <div className="h-64 animate-pulse rounded-2xl bg-slate-100" />
+    </div>
+  );
+}
+
 function DayBoard({
   data,
   onSlot,
@@ -226,21 +301,24 @@ function DayBoard({
   onBooking: (booking: CalendarBooking) => void;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {data.resources.map((resource) => {
         const day = resource.days[0];
         if (!day) return null;
         return (
-          <div key={resource.id} className="overflow-hidden rounded-brand border border-border bg-white">
-            <div className="flex items-center justify-between border-b border-border bg-night px-4 py-3 text-white">
-              <div>
-                <div className="font-bold">{resource.name}</div>
-                <div className="text-xs text-white/55">
-                  {day.closed ? "مغلق" : `${day.opensAt}–${day.closesAt}`}
+          <section key={resource.id} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-6 md:flex-row md:items-center">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-3 rounded-full bg-brand" />
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">{resource.name}</h2>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-400">
+                    {day.closed ? "مغلق" : `${day.opensAt} – ${day.closesAt}`} · اضغط ساعة فارغة للحجز
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="p-3">
+            <div className="p-6">
               {day.closed ? (
                 <div className="px-3 py-6 text-sm text-text-muted">مغلق</div>
               ) : day.slots.length === 0 ? (
@@ -294,7 +372,7 @@ function DayBoard({
                 </div>
               )}
             </div>
-          </div>
+          </section>
         );
       })}
     </div>
@@ -315,7 +393,7 @@ function WeekBoard({
     return <div className="rounded-brand border border-border bg-white p-8 text-sm">اختر مساحة واحدة لعرض الأسبوع.</div>;
   }
   return (
-    <div className="calendar-scroll overflow-x-auto rounded-brand border border-border bg-white">
+    <div className="calendar-scroll overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="grid min-w-[720px] grid-cols-7 divide-x divide-border md:min-w-[980px]">
         {resource.days.map((day) => (
           <div key={day.date} className="min-w-[110px]">

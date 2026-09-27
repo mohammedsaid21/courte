@@ -111,6 +111,7 @@ body {
   .reveal-3 {
     animation: rise 0.7s ease 0.24s both;
   }
+
 }
 
 @keyframes rise {

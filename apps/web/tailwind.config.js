@@ -4,6 +4,21 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        arena: {
+          DEFAULT: "#16C75A",
+          deep: "#087A3E",
+          stadium: "#07130D",
+          surface: "#0D1C13",
+          pitch: "#123D25",
+          lime: "#B8FF3B",
+          warm: "#F5F7F2",
+        },
+        warm: "#F5F7F2",
+        line: "#E1E8E2",
+        copy: {
+          primary: "#101812",
+          secondary: "#68736B",
+        },
         night: {
           DEFAULT: "#0A3D26",
           800: "#0E4A2E",
@@ -90,6 +105,15 @@ module.exports = {
       boxShadow: {
         sheet: "0 24px 60px rgba(10, 61, 38, 0.22)",
         glass: "0 14px 40px rgba(18, 36, 28, 0.10)",
+      },
+      keyframes: {
+        "hero-float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
+      },
+      animation: {
+        "hero-float": "hero-float 6s ease-in-out infinite",
       },
     },
   },

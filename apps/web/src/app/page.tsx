@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { HomeLanding } from "@/components/home-landing";
 
 export const metadata: Metadata = {
-  title: "ملعبك جاهز",
-  description: "اعثر على ملعب كرة قدم في مدينتك واحجزه خلال دقائق.",
+  title: "ميدان — احجز ملعبك في الضفة الغربية",
+  description: "احجز ملاعب كرة القدم والمرافق الرياضية في رام الله، نابلس، الخليل، بيت لحم والقدس. حساب مجاني للتصفح والحجز.",
   alternates: { canonical: "/" },
 };
 

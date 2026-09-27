@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" className="scroll-smooth">
       <body className={`${display.variable} ${body.variable} bg-bg font-sans antialiased`}>
         <SessionProvider>
           <SiteHeader />

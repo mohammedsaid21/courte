@@ -7,12 +7,12 @@ import { useEffect, useState } from "react";
 import { useSession } from "./session-provider";
 import { createClient } from "@/lib/supabase/client";
 import { Wordmark } from "@/components/wordmark";
+import { exploreVenuesHref, signupWithNext, VENUE_DISCOVERY_PATH } from "@/lib/auth-routes";
 import { cn, OWNER_APP_URL } from "@/lib/utils";
 
-const links = [
-  { href: "/venues", label: "الملاعب" },
-  { href: "/#how", label: "طريقة الحجز" },
-  { href: "/#owners", label: "لأصحاب الملاعب" },
+const publicLinks = [
+  { href: "/#how", label: "كيف يعمل" },
+  { href: "/#sports", label: "الرياضات" },
 ];
 
 export function SiteHeader() {
@@ -20,10 +20,25 @@ export function SiteHeader() {
   const router = useRouter();
   const { session, loading } = useSession();
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  const home = pathname === "/";
+  const authed = Boolean(session);
+  const gameHref = loading ? signupWithNext(VENUE_DISCOVERY_PATH) : exploreVenuesHref(authed);
+  const signupHref = signupWithNext(VENUE_DISCOVERY_PATH);
+  const loginHref = `/login?next=${encodeURIComponent(VENUE_DISCOVERY_PATH)}`;
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!home) return;
+    const onScroll = () => setScrolled(window.scrollY > 56);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [home]);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -38,73 +53,98 @@ export function SiteHeader() {
     router.replace("/");
   }
 
-  const home = pathname === "/";
+  const solid = home && scrolled;
+  const transparentHero = home && !scrolled;
 
   return (
     <header
       className={cn(
-        "z-40",
-        home
-          ? "absolute inset-x-0 top-0 border-transparent bg-gradient-to-b from-pitch-deep/80 via-pitch-deep/35 to-transparent"
-          : "sticky top-0 border-b border-white/50 bg-white/60 backdrop-blur-xl",
+        "z-40 transition-colors duration-300",
+        home ? "fixed inset-x-0 top-0" : "sticky top-0 border-b border-line bg-white/95 backdrop-blur-md",
+        solid && "border-b border-arena-pitch/30 bg-arena-stadium/95 backdrop-blur-md",
       )}
     >
-      <div className="mx-auto flex h-[72px] max-w-6xl items-center justify-between px-4 md:px-6">
-        <Wordmark />
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 md:px-8">
+        <Wordmark variant={transparentHero ? "stadium" : home ? "brand" : "classic"} />
         <nav
           className={cn(
-            "hidden items-center gap-7 text-sm font-bold md:flex",
-            home ? "text-white/90" : "text-text/80",
+            "hidden items-center gap-8 text-sm font-bold md:flex",
+            transparentHero ? "text-white/85" : home ? "text-white/90" : "text-copy-secondary",
           )}
           aria-label="التنقل الرئيسي"
         >
-          {links.map((link) => (
+          {publicLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={cn("transition-colors", home ? "hover:text-white" : "hover:text-pitch")}
+              className={cn(
+                "transition-colors",
+                transparentHero ? "hover:text-arena-lime" : home ? "hover:text-white" : "hover:text-arena-deep",
+              )}
             >
               {link.label}
             </Link>
           ))}
+          {authed && (
+            <Link
+              href="/venues"
+              className={cn(transparentHero ? "hover:text-arena-lime" : home ? "hover:text-white" : "hover:text-arena-deep")}
+            >
+              الملاعب
+            </Link>
+          )}
         </nav>
-        <div className="hidden items-center gap-4 md:flex">
-          {loading ? null : session ? (
+        <div className="hidden items-center gap-3 md:flex">
+          {loading ? null : authed ? (
             <>
               <Link
                 href="/account/bookings"
-                className={cn("text-sm font-bold", home ? "text-white/85 hover:text-white" : "text-text/75 hover:text-pitch")}
+                className={cn(
+                  "text-sm font-bold",
+                  transparentHero ? "text-white/85 hover:text-white" : home ? "text-white/85" : "text-copy-secondary hover:text-arena-deep",
+                )}
               >
                 حجوزاتي
               </Link>
               <button
                 type="button"
                 onClick={() => void logout()}
-                className={cn("text-sm font-bold", home ? "text-white/85 hover:text-white" : "text-text/75 hover:text-pitch")}
+                className={cn(
+                  "text-sm font-bold",
+                  transparentHero ? "text-white/85 hover:text-white" : home ? "text-white/85" : "text-copy-secondary",
+                )}
               >
                 خروج
               </button>
+              <Link
+                href={gameHref}
+                className="inline-flex min-h-11 items-center bg-arena px-4 text-sm font-black text-arena-stadium hover:bg-arena-lime hover:text-arena-stadium"
+              >
+                اعثر على مباراتك
+              </Link>
             </>
           ) : (
-            <Link
-              href="/login"
-              className={cn("text-sm font-bold", home ? "text-white/85 hover:text-white" : "text-text/75 hover:text-pitch")}
-            >
-              دخول
-            </Link>
+            <>
+              <Link
+                href={loginHref}
+                className={cn(
+                  "text-sm font-bold",
+                  transparentHero ? "text-white/85 hover:text-white" : home ? "text-white/85" : "text-copy-secondary hover:text-arena-deep",
+                )}
+              >
+                دخول
+              </Link>
+              <Link
+                href={signupHref}
+                className="inline-flex min-h-11 items-center bg-arena px-4 text-sm font-black text-arena-stadium hover:bg-arena-deep hover:text-white"
+              >
+                إنشاء حساب
+              </Link>
+            </>
           )}
-          <Link
-            href="/venues"
-            className={cn(
-              "inline-flex min-h-11 items-center rounded-[12px] px-4 text-sm font-bold",
-              home ? "bg-gold text-pitch-deep hover:bg-gold-soft" : "bg-pitch text-white hover:bg-pitch-dark",
-            )}
-          >
-            احجز ملعبك
-          </Link>
         </div>
         <button
-          className={cn("rounded-lg p-2 md:hidden", home ? "text-white" : "text-pitch")}
+          className={cn("rounded-lg p-2 md:hidden", transparentHero || home ? "text-white" : "text-arena-stadium")}
           onClick={() => setOpen(true)}
           aria-label="فتح القائمة"
           aria-expanded={open}
@@ -114,39 +154,40 @@ export function SiteHeader() {
         </button>
       </div>
       {open && (
-        <div id="mobile-menu" className="fixed inset-0 z-50 bg-pitch-deep/80 backdrop-blur-sm md:hidden">
-          <div className="glass m-3 rounded-[12px] p-5">
+        <div id="mobile-menu" className="fixed inset-0 z-50 bg-arena-stadium/90 backdrop-blur-sm md:hidden">
+          <div className="m-3 border border-line bg-white p-5">
             <div className="flex items-center justify-between">
-              <Wordmark href={null} />
+              <Wordmark href={null} variant="brand" />
               <button onClick={() => setOpen(false)} aria-label="إغلاق القائمة" className="p-2">
                 <X size={22} />
               </button>
             </div>
-            <nav className="mt-8 flex flex-col gap-4 font-display text-2xl font-extrabold" aria-label="قائمة الهاتف">
-              {links.map((link) => (
+            <nav className="mt-8 flex flex-col gap-4 font-display text-xl font-extrabold text-copy-primary" aria-label="قائمة الهاتف">
+              {publicLinks.map((link) => (
                 <Link key={link.href} href={link.href} onClick={() => setOpen(false)}>
                   {link.label}
                 </Link>
               ))}
-              {session ? (
-                <Link href="/account/bookings" onClick={() => setOpen(false)}>
-                  حجوزاتي
-                </Link>
+              {authed ? (
+                <>
+                  <Link href="/venues" onClick={() => setOpen(false)}>الملاعب</Link>
+                  <Link href="/account/bookings" onClick={() => setOpen(false)}>حجوزاتي</Link>
+                  <button type="button" className="text-start" onClick={() => void logout()}>خروج</button>
+                </>
               ) : (
-                <Link href="/login" onClick={() => setOpen(false)}>
-                  دخول
-                </Link>
+                <>
+                  <Link href={loginHref} onClick={() => setOpen(false)}>دخول</Link>
+                  <Link href={signupHref} onClick={() => setOpen(false)}>إنشاء حساب</Link>
+                </>
               )}
-              <a href={`${OWNER_APP_URL}/signup`} onClick={() => setOpen(false)}>
-                لأصحاب الملاعب
-              </a>
+              <a href={`${OWNER_APP_URL}/signup`} onClick={() => setOpen(false)}>لأصحاب الملاعب</a>
             </nav>
             <Link
-              href="/venues"
+              href={gameHref}
               onClick={() => setOpen(false)}
-              className="mt-8 inline-flex min-h-14 w-full items-center justify-center rounded-[12px] bg-pitch text-base font-bold text-white"
+              className="mt-8 inline-flex min-h-14 w-full items-center justify-center bg-arena text-base font-black text-arena-stadium"
             >
-              احجز ملعبك
+              اعثر على مباراتك
             </Link>
           </div>
         </div>
